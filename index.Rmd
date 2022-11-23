@@ -19,14 +19,26 @@ source('./R/plot.func.addition.R')
 ```
 
 ## Credits
-- Analysis by Chrispin Chaguza
-- Experiments by Anna York
-- Sequencing by Jason Rosch and colleagues (St Jude's)
-- Interactive plots by Dan Weinberger
 
+-   Analysis by Chrispin Chaguza
+-   Experiments by Anna York
+-   Sequencing by Jason Rosch and colleagues (St Jude's)
+-   Interactive plots by Dan Weinberger
+
+```{r}
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+      x)
+  } else x
+}
+```
 
 ## Summary
-These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has gained a gene (yellow) or lost a gene(dark blue) compared to the reference
+
+These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has `r colorize("gained a gene", "#FDE725FF")` or `r colorize("lost a gene", "#404788FF")` compared to the reference
 
 ```{r}
 key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
@@ -67,7 +79,3 @@ Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isol
 plot.func.addition(g3)
 
 ```
-
-
-
-
