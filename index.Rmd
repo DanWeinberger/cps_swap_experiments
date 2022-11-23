@@ -1,0 +1,18 @@
+---
+title: "index"
+author: "Dan Weinberger"
+date: '2022-11-23'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+g1 <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE)
+
+
+
+```
+
