@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F)
 library(dplyr)
 library(ggplot2)
 library(plotly)
@@ -14,89 +14,48 @@ library(plotly)
 library(viridis)
 library(hrbrthemes)
 library(heatmaply)
+source('./R/plot.func.R')
 ```
 
 
 ```{r}
 key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
 
-```
-
-```{r}
 g1 <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
-```
+g2 <- read.table(file = './Data/Group2 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
-
-```{r}
-g2 <- g1 %>%
-  mutate(strain= row.names(g1)) %>%
-  left_join(key1, by='strain')%>%
-  select(-strain, -parent_ST) %>%
-  mutate(ID2 = paste(new_ST,Clone, sep='_'))
-
-test <- unique(g1)
-nrow(test)==nrow(g1) #if T, no rows removed
-```
-
-```{r}
-g2.m <- g2 %>%
-    mutate(ID2 = paste(new_ST,Clone, sep='_')) %>%
-  reshape2::melt(id.vars=c('new_ST','Clone','ID2')) %>%
-  arrange(ID2, Clone) %>%
-  mutate(value=as.factor(value), group=grepl('group',variable)) %>%
-  filter(group==0)
-
-# Simple heatmap, unstructured except sort by ST
-ggplot(g2.m ,aes(variable, ID2, fill= value)) + 
-  geom_tile()
+g3 <- read.table(file = './Data/Group3 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
 ```
 
-focus on genes that have a clear annotation
-```{r}
-g2a <- g2 %>%
-    mutate(ID2 = paste(new_ST,Clone, sep='_'))
-row.names(g2a) <- g2a$ID2
+## Serotype 9V background
 
-mat1 <- g2a %>%
-  dplyr::select(-new_ST,-Clone, -ID2) %>%
-  as.matrix()
+Parent strain is Serotype 9V ID ABC010001831, obtained from the CDC
 
-groupvar=grep('group',colnames(mat1))
-
-mat1 <- mat1[,-groupvar]
-```
-
-
-```{r, fig.width=20, fig.height=10}
-library(pheatmap)
-p2 <- pheatmap(mat1)
-p2
-
-```
-
-
-
-this takes a really long time to render
 ```{r, fig.width=10, fig.height=5}
+plot.func(g1)
 
-p <- heatmaply(mat1, 
-        #dendrogram = "row",
-        xlab = "", ylab = "", 
-        main = "",
-        scale = "none",
-        margins = c(60,100,40,20),
-        grid_gap=0,
-        titleX = FALSE,
-        hide_colorbar = TRUE,
-        branches_lwd = 0.1,
-        label_names = c("Serotype/isolate", "Feature:", "Value"),
-        fontsize_row = 5, fontsize_col = 5,
-        labCol = colnames(mat1),
-        labRow = rownames(mat1),
-        heatmap_layers = theme(axis.line=element_blank())
-        )
-p
 ```
+
+## Serotype 15B/C background
+
+Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
+
+```{r, fig.width=10, fig.height=5}
+plot.func(g2)
+
+```
+
+## Serotype 22F background
+
+Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
+
+```{r, fig.width=10, fig.height=5}
+plot.func(g3)
+
+```
+
+
+
 
