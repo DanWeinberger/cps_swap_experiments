@@ -14,6 +14,8 @@ library(viridis)
 library(hrbrthemes)
 library(heatmaply)
 source('./R/plot.func.R')
+source('./R/plot.func.addition.R')
+
 ```
 
 ## Credits
@@ -24,7 +26,7 @@ source('./R/plot.func.R')
 
 
 ## Summary
-These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has the gene or not. the NA/NA strain is the parent cps- strain and can serve as a reference
+These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has gained a gene (yellow) or lost a gene(dark blue) compared to the reference
 
 ```{r}
 key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
@@ -44,7 +46,7 @@ a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annot
 Parent strain is Serotype 9V ID ABC010001831, obtained from the CDC
 
 ```{r, fig.width=10, fig.height=5}
-plot.func(g1)
+plot.func.addition(g1)
 
 ```
 
@@ -53,7 +55,7 @@ plot.func(g1)
 Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
 
 ```{r, fig.width=10, fig.height=5}
-plot.func(g2)
+plot.func.addition(g2)
 
 ```
 
@@ -62,7 +64,7 @@ plot.func(g2)
 Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
 
 ```{r, fig.width=10, fig.height=5}
-plot.func(g3)
+plot.func.addition(g3)
 
 ```
 
