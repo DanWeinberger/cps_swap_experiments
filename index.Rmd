@@ -7,12 +7,58 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+#library(d3heatmap)
+library(viridis)
+library(hrbrthemes)
+library(heatmaply)
+```
+
+
+```{r}
+key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
+
 ```
 
 ```{r}
 g1 <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
+```
 
 
+```{r}
+g2 <- g1 %>%
+  mutate(strain= row.names(g1)) %>%
+  left_join(key1, by='strain')%>%
+  select(-strain, -parent_ST)
+
+
+```
+
+
+
+
+```{r, eval=F}
+mat1 <- as.matrix(g1)
+
+p <- heatmaply(mat1, 
+        #dendrogram = "row",
+        xlab = "", ylab = "", 
+        main = "",
+        scale = "column",
+        margins = c(60,100,40,20),
+        grid_color = "white",
+        grid_width = 0.00000001,
+        titleX = FALSE,
+        hide_colorbar = TRUE,
+        branches_lwd = 0.1,
+        label_names = c("Country", "Feature:", "Value"),
+        fontsize_row = 5, fontsize_col = 5,
+        labCol = colnames(mat1),
+        labRow = rownames(mat1),
+        heatmap_layers = theme(axis.line=element_blank())
+        )
 ```
 
