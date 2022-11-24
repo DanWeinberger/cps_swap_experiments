@@ -49,7 +49,15 @@ g2 <- read.table(file = './Data/Group2 gene.presence_absence.tsv', sep = '\t', h
 
 g3 <- read.table(file = './Data/Group3 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
-a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annotations.tsv', sep = '\t', header = TRUE)
+a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annotations.tsv', sep = '\t', header = TRUE) %>%
+  mutate(Gene= gsub('~~~~~~','......', fixed=T, Gene ),Non.unique.Gene.name = gsub(';','',Non.unique.Gene.name,fixed=T)) %>%
+  filter(Non.unique.Gene.name!='') %>%
+  arrange(Non.unique.Gene.name) %>%
+  group_by(Non.unique.Gene.name) %>%
+  mutate(allele = paste0(Non.unique.Gene.name,'_', row_number()),
+        ) %>%
+  ungroup() %>%
+  select(allele,Cps.Gene, Gene,Non.unique.Gene.name)
 
 ```
 

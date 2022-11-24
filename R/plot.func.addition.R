@@ -11,17 +11,23 @@ ds2 <- ds %>%
 
 ds2a <- ds2 %>%
   mutate(ID2 = paste(new_ST,Clone, sep='_'))
+
 row.names(ds2a) <- ds2a$ID2
 
-mat1 <- ds2a %>%
+ds2a.m <- reshape2::melt(ds2a, id.vars=c('new_ST','Clone','ID2')) %>%
+  left_join(a1, by=c('variable'='Gene')) %>%
+  filter(!is.na(allele)) 
+
+ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~allele)
+
+rownames(ds2a.c) <- ds2a.c$ID2
+
+mat1 <- ds2a.c %>%
   dplyr::select(-new_ST,-Clone, -ID2) %>%
   as.matrix()
 
-groupvar=grep('group',colnames(mat1))
 
-mat1 <- mat1[,-groupvar]
-
-ref <- mat1[is.na(ds2a$new_ST) ,]
+ref <- mat1[is.na(ds2a.c$new_ST) ,]
 
 #is it discordant from reference?
 #if they are equal, it returns 0, if present in x and absent in ref 1, if lost between ref and x =-1
