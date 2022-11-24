@@ -121,6 +121,8 @@ TabularToFasta("./Data/genes.csv")
 ```
 
 ## Genomic context of gain/loss based on mapping to TIGR4 genome
+
+Set 1
 ```{r}
 loc1 <- read.csv('./Data/tigr4-blast-Alignment-HitTable.csv', header=F) %>%
   filter(V2=='CP089948.1') %>%
@@ -133,13 +135,49 @@ p1a <- p1$gain_loss %>%
   filter(value %in% c(-1,1) & !is.na(start)) %>%
   mutate(value=as.factor(value) ,strainN=as.numeric(as.factor(strain)))
 
-p2 <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
-         geom_point() +
+p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
+         geom_point(size=0.3) +
        theme_classic() +
   geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
 
-ggplotly(p2)
+ggplotly(p2a)
 ```
+Set 2
+
+```{r}
+
+p1a <- p2$gain_loss %>%
+  dplyr::rename(strain=Var1, allele=Var2) %>%
+  left_join(loc1, by='allele') %>%
+  filter(value %in% c(-1,1) & !is.na(start)) %>%
+  mutate(value=as.factor(value) ,strainN=as.numeric(as.factor(strain)))
+
+p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
+         geom_point(size=0.3) +
+       theme_classic() +
+  geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
+
+ggplotly(p2a)
+```
+ Set 3
+ 
+
+```{r}
+
+p1a <- p3$gain_loss %>%
+  dplyr::rename(strain=Var1, allele=Var2) %>%
+  left_join(loc1, by='allele') %>%
+  filter(value %in% c(-1,1) & !is.na(start)) %>%
+  mutate(value=as.factor(value) ,strainN=as.numeric(as.factor(strain)))
+
+p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
+         geom_point(size=0.3) +
+       theme_classic() +
+  geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
+
+ggplotly(p2a)
+```
+
 
 
 
