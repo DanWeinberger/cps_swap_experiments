@@ -33,6 +33,9 @@ ref <- mat1[is.na(ds2a.c$new_ST) ,]
 #if they are equal, it returns 0, if present in x and absent in ref 1, if lost between ref and x =-1
 disc <- t(apply(mat1, 1, function(x)  x-ref))
   
+disc.m <- reshape2::melt(disc)
+
+
 p <- heatmaply(disc, 
                #dendrogram = "row",
                xlab = "", ylab = "", 
@@ -49,5 +52,6 @@ p <- heatmaply(disc,
                labRow = rownames(disc),
                heatmap_layers = theme(axis.line=element_blank())
 )
-return(p)
+out.list=list('p'=p, 'gain_loss'=disc.m)
+return(out.list)
 }

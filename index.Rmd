@@ -13,7 +13,6 @@ library(plotly)
 library(viridis)
 library(hrbrthemes)
 library(heatmaply)
-source('./R/plot.func.R')
 source('./R/plot.func.addition.R')
 
 ```
@@ -57,7 +56,7 @@ a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annot
   mutate(allele = paste0(Non.unique.Gene.name,'_', row_number()),
         ) %>%
   ungroup() %>%
-  select(allele,Cps.Gene, Gene,Non.unique.Gene.name)
+  select(allele,Cps.Gene, Gene,Non.unique.Gene.name, Sequence)
 
 ```
 
@@ -66,8 +65,9 @@ a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annot
 Parent strain is Serotype 9V ID ABC010001831, obtained from the CDC
 
 ```{r, fig.width=10, fig.height=5}
-plot.func.addition(g1)
+p1 <- plot.func.addition(g1)
 
+p1$p
 ```
 
 ## Serotype 15B/C background
@@ -75,8 +75,8 @@ plot.func.addition(g1)
 Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
 
 ```{r, fig.width=10, fig.height=5}
-plot.func.addition(g2)
-
+p2 <- plot.func.addition(g2)
+p2$p
 ```
 
 ## Serotype 22F background
@@ -84,6 +84,62 @@ plot.func.addition(g2)
 Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
 
 ```{r, fig.width=10, fig.height=5}
-plot.func.addition(g3)
-
+p3 <- plot.func.addition(g3)
+p3$p
 ```
+
+```{r}
+p1$gain_loss <- p1$gain_loss %>%
+  mutate(parentST='9V')
+
+p2$gain_loss <- p2$gain_loss %>%
+  mutate(parentST='15BC')
+
+p3$gain_loss <- p3$gain_loss %>%
+  mutate(parentST='22F')
+  
+
+#here we are looking for strains that have gain of one allele and loss of another..see 15B.C #3; gpsB_1
+combined <- bind_rows(p1$gain_loss, p2$gain_loss, p3$gain_loss) %>%
+  filter(value %in% c(-1,1)) %>%
+  arrange(Var1, Var2)
+```
+
+
+```{r, eval=F}
+#prepare  for BLAST
+
+library (devtools)
+library (tidyverse)
+source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_and_tabular.R")
+
+ a1 %>% select(allele, Sequence) %>%
+  write.csv('./Data/genes.csv', row.names = F)
+TabularToFasta("./Data/genes.csv")
+
+#IN BLAST, upload, BLAST against TIGR4 specifically, then 'download all' as hit table csv
+```
+
+## Genomic context of gain/loss based on mapping to TIGR4 genome
+```{r}
+loc1 <- read.csv('./Data/tigr4-blast-Alignment-HitTable.csv', header=F) %>%
+  filter(V2=='CP089948.1') %>%
+  dplyr::rename(allele=V1, start=V9, end=V10) %>%
+  select(allele, start, end)
+
+p1a <- p1$gain_loss %>%
+  dplyr::rename(strain=Var1, allele=Var2) %>%
+  left_join(loc1, by='allele') %>%
+  filter(value %in% c(-1,1) & !is.na(start)) %>%
+  mutate(value=as.factor(value) ,strainN=as.numeric(as.factor(strain)))
+
+p2 <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
+         geom_point() +
+       theme_classic() +
+  geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
+
+ggplotly(p2)
+```
+
+
+
