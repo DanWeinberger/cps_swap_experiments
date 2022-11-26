@@ -24,23 +24,13 @@ source('./R/plot.func.addition.R')
 -   Sequencing by Jason Rosch and colleagues (St Jude's)
 -   Interactive plots by Dan Weinberger
 
-```{r}
-colorize <- function(x, color) {
-  if (knitr::is_latex_output()) {
-    sprintf("\\textcolor{%s}{%s}", color, x)
-  } else if (knitr::is_html_output()) {
-    sprintf("<span style='color: %s;'>%s</span>", color,
-      x)
-  } else x
-}
-```
-
 ## Summary
 
-These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has `r colorize("gained a gene", "#FDE725FF")` or `r colorize("lost a gene", "#404788FF")` compared to the reference
+These plots represent pangenomes created based on the sequenced strains. The heatmaps indicate whether a particular strain has **gained a gene (yellow)** or **lost a gene(dark blue)** compared to the reference. The plots at the bottom show the genomic location of genes gained and lost, mapped to a TIGR4 reference
 
 ```{r}
-key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
+key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% 
+  dplyr::rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
 
 g1 <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE)
 
@@ -105,7 +95,6 @@ combined <- bind_rows(p1$gain_loss, p2$gain_loss, p3$gain_loss) %>%
   arrange(Var1, Var2)
 ```
 
-
 ```{r, eval=F}
 #prepare  for BLAST
 
@@ -123,6 +112,7 @@ TabularToFasta("./Data/genes.csv")
 ## Genomic context of gain/loss based on mapping to TIGR4 genome
 
 Set 1
+
 ```{r}
 loc1 <- read.csv('./Data/tigr4-blast-Alignment-HitTable.csv', header=F) %>%
   filter(V2=='CP089948.1') %>%
@@ -142,6 +132,7 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 
 ggplotly(p2a)
 ```
+
 Set 2
 
 ```{r}
@@ -159,8 +150,8 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 
 ggplotly(p2a)
 ```
- Set 3
- 
+
+Set 3
 
 ```{r}
 
@@ -177,7 +168,3 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 
 ggplotly(p2a)
 ```
-
-
-
-

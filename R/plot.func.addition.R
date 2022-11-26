@@ -1,4 +1,4 @@
-key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
+key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% dplyr::rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
 
 #are any genes added vs reference? 
 
@@ -16,7 +16,8 @@ row.names(ds2a) <- ds2a$ID2
 
 ds2a.m <- reshape2::melt(ds2a, id.vars=c('new_ST','Clone','ID2')) %>%
   left_join(a1, by=c('variable'='Gene')) %>%
-  filter(!is.na(allele)) 
+  filter(!is.na(allele)) %>%
+  mutate(value=as.numeric(value))
 
 ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~allele)
 
@@ -24,7 +25,7 @@ rownames(ds2a.c) <- ds2a.c$ID2
 
 mat1 <- ds2a.c %>%
   dplyr::select(-new_ST,-Clone, -ID2) %>%
-  as.matrix()
+  as.matrix() 
 
 
 ref <- mat1[is.na(ds2a.c$new_ST) ,]
