@@ -104,9 +104,22 @@ source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_
 
  a1 %>% select(allele, Sequence) %>%
   write.csv('./Data/genes.csv', row.names = F)
-TabularToFasta("./Data/genes.csv")
+#TabularToFasta("./Data/genes.csv")
 
-#IN BLAST, upload, BLAST against TIGR4 specifically, then 'download all' as hit table csv
+ prot1 <- a1 %>% select(allele, Sequence)
+
+ prot2 <-  apply(prot1,1, function(x){
+      as.character(translate(DNAString(x['Sequence'])))
+      }, simplify=F) %>%
+   unlist()
+
+ prot3 <- cbind.data.frame('allele'=a1$allele, 'aa'=prot2 ) %>%  write.csv('./Data/aa.csv', row.names = F)
+
+TabularToFasta("./Data/aa.csv")
+
+
+
+#IN tblastn, upload AA sequence, BLAST against TIGR4 specifically, then 'download all' as hit table csv. note use tblastn NOT blastn
 ```
 
 ## Genomic context of gain/loss based on mapping to TIGR4 genome
@@ -114,10 +127,11 @@ TabularToFasta("./Data/genes.csv")
 Set 1
 
 ```{r}
-loc1 <- read.csv('./Data/tigr4-blast-Alignment-HitTable.csv', header=F) %>%
+loc1 <- read.csv('./Data/tigr4-tblastn-Alignment-HitTable.csv', header=F) %>%
   filter(V2=='CP089948.1') %>%
-  dplyr::rename(allele=V1, start=V9, end=V10) %>%
-  select(allele, start, end)
+  dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10) %>%
+  filter(pct_ident>70) %>%
+  select(allele, start, end,pct_ident)
 
 p1a <- p1$gain_loss %>%
   dplyr::rename(strain=Var1, allele=Var2) %>%
