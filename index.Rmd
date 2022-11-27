@@ -147,7 +147,7 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 ggplotly(p2a)
 ```
 
-Set 2
+Set 2: Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
 
 ```{r}
 
@@ -165,7 +165,7 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 ggplotly(p2a)
 ```
 
-Set 3
+Set 3: Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
 
 ```{r}
 
