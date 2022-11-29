@@ -134,7 +134,7 @@ Set 1
 loc1 <- read.csv('./Data/tigr4-tblastn-Alignment-HitTable.csv', header=F) %>%
   filter(V2=='CP089948.1') %>%
   dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10) %>%
-  filter(pct_ident>70) %>%
+  filter(pct_ident>90) %>%
   select(allele, start, end,pct_ident)
 
 p1a <- p1$gain_loss %>%
@@ -146,6 +146,8 @@ p1a <- p1$gain_loss %>%
 p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
          geom_point(size=0.3) +
        theme_classic() +
+    xlim(range(loc1$start) ) +
+
   geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
 
 ggplotly(p2a)
@@ -166,6 +168,7 @@ p1a <- p2$gain_loss %>%
 p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
          geom_point(size=0.3) +
        theme_classic() +
+    xlim(range(loc1$start) ) +
   geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
 
 ggplotly(p2a)
@@ -185,6 +188,7 @@ p1a <- p3$gain_loss %>%
 p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
          geom_point(size=0.3) +
        theme_classic() +
+    xlim(range(loc1$start) ) +
   geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
 
 ggplotly(p2a)
