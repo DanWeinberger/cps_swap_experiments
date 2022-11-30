@@ -133,9 +133,11 @@ Set 1
 ```{r}
 loc1 <- read.csv('./Data/tigr4-tblastn-Alignment-HitTable.csv', header=F) %>%
   filter(V2=='CP089948.1') %>%
-  dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10) %>%
-  filter(pct_ident>90) %>%
-  select(allele, start, end,pct_ident)
+  dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10, positives_pct=V13, matchNaa=V4, query_length =V8) %>%
+  mutate(pct_coverage = (matchNaa)/query_length*100
+         ) %>%
+  filter(pct_ident>80 & pct_coverage >80) %>%
+  select(allele, start, end,pct_ident,pct_coverage,query_length)
 
 p1a <- p1$gain_loss %>%
   dplyr::rename(strain=Var1, allele=Var2) %>%
