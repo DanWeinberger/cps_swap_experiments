@@ -195,3 +195,31 @@ p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele
 
 ggplotly(p2a)
 ```
+
+
+## Same but align to Hungary-19A
+
+```{r}
+loc2 <- read.csv('./Data/hungary19A-tblastn-Alignment-HitTable.csv', header=F) %>%
+  dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10, positives_pct=V13, matchNaa=V4, query_length =V8) %>%
+  mutate(pct_coverage = (matchNaa)/query_length*100
+         ) %>%
+  filter(pct_ident>80 & pct_coverage >80) %>%
+  select(allele, start, end,pct_ident,pct_coverage,query_length)
+
+
+p1a <- p1$gain_loss %>%
+  dplyr::rename(strain=Var1, allele=Var2) %>%
+  left_join(loc2, by='allele') %>%
+  filter(value %in% c(-1,1) & !is.na(start)) %>%
+  mutate(value=as.factor(value) ,strainN= as.numeric(as.factor(strain))+rnorm(n(), 0, 0.05) )
+
+p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
+         geom_point(size=0.3) +
+       theme_classic() +
+    xlim(range(loc2$start) ) +
+  geom_vline(xintercept=c(56407, 2244856)) #roughly dexB and aliA
+
+ggplotly(p2a)
+```
+
