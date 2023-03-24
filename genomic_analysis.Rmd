@@ -41,7 +41,7 @@ g3 <- read.table(file = './Data/Group3 gene.presence_absence.tsv', sep = '\t', h
 
 a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annotations.tsv', sep = '\t', header = TRUE) %>%
   mutate(Gene= gsub('~~~~~~','......', fixed=T, Gene ),Non.unique.Gene.name = gsub(';','',Non.unique.Gene.name,fixed=T)) %>%
-  filter(Non.unique.Gene.name!='') %>%
+  #filter(Non.unique.Gene.name!='') %>%
   arrange(Non.unique.Gene.name) %>%
   group_by(Non.unique.Gene.name) %>%
   mutate(allele = paste0(Non.unique.Gene.name,'_', row_number()),
@@ -104,11 +104,16 @@ combined <- bind_rows(p1$gain_loss, p2$gain_loss, p3$gain_loss) %>%
 
 library (devtools)
 library (tidyverse)
+#install.packages("BiocManager")
+#BiocManager::install("Biostrings")
+library(Biostrings)
 source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_and_tabular.R")
 
  a1 %>% select(allele, Sequence) %>%
   write.csv('./Data/genes.csv', row.names = F)
 #TabularToFasta("./Data/genes.csv")
+ source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_and_tabular.R")
+
 
  prot1 <- a1 %>% select(allele, Sequence)
 
@@ -117,18 +122,18 @@ source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_
       }, simplify=F) %>%
    unlist()
 
- prot3 <- cbind.data.frame('allele'=a1$allele, 'aa'=prot2 ) %>%  write.csv('./Data/aa.csv', row.names = F)
+ prot3 <- cbind.data.frame('allele'=a1$allele, 'aa'=prot2 ) %>% 
+   mutate(allele=paste0('gene',allele)) %>%   
+   write.csv('./Data/aa.csv', row.names = F)
 
-TabularToFasta("./Data/aa.csv")
-
-
+TabularToFasta("./Data/aa.csv")  #note this generates a FASTA file on the home directory called dna_fasta.fasta
 
 #IN tblastn, upload AA sequence, BLAST against TIGR4 specifically, then 'download all' as hit table csv. note use tblastn NOT blastn
 ```
 
 ## Genomic context of gain/loss based on mapping to TIGR4 genome
 
-Set 1
+Set 1: Parent Strain is 9V
 
 8, 7F, 7C, 6C, 22F, 19A
 ```{r}
@@ -138,7 +143,8 @@ loc1 <- read.csv('./Data/tigr4-tblastn-Alignment-HitTable.csv', header=F) %>%
   mutate(pct_coverage = (matchNaa)/query_length*100
          ) %>%
   filter(pct_ident>80 & pct_coverage >80) %>%
-  select(allele, start, end,pct_ident,pct_coverage,query_length)
+  select(allele, start, end,pct_ident,pct_coverage,query_length) %>%
+  mutate(allele = gsub('gene','',allele))
 
 p1a <- p1$gain_loss %>%
   dplyr::rename(strain=Var1, allele=Var2) %>%

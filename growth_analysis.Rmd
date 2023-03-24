@@ -1,0 +1,155 @@
+---
+title: "Growth data"
+author: "Dan Weinberger"
+date: '2023-03-24'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr)
+library(ggplot2)
+library(purrr)
+library(readxl)
+library(patchwork)
+library(reshape2)
+library(plotly)
+```
+
+Read in the data
+
+```{r}
+a1 <- read_xlsx('./Data/Growth_Curve_Summary_2023.xlsx')
+```
+
+```{r}
+names(a1)
+```
+
+reshape to long format
+```{r}
+a1.m <- reshape2::melt(a1, id.vars=c('ID','Recipient','Donor','Clone_N','Rep')) %>%
+  arrange(ID,Recipient, Donor, Clone_N,Rep, value) %>%
+  group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+  mutate( index= row_number() -1,  
+          t= index/2,
+          t0=min(value, na.rm=T),
+          OD= value - t0 )  %>%
+  ungroup()
+```
+
+
+Group by recipient, color by donor
+
+```{r}
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Donor)) +
+  geom_line()+
+  theme_classic() +
+  facet_wrap(~Recipient)
+
+p1
+```
+Group by Donor, color by recipient
+
+```{r}
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Recipient)) +
+  geom_line()+
+  theme_classic() +
+  facet_wrap(~Donor)
+
+p1
+```
+
+## Calculate Max OD
+
+```{r}
+max.od <- a1.m %>%
+    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+    summarize( max_od=max(OD, na.rm=T))
+
+max.od
+```
+
+
+Smooth with a spline
+
+```{r}
+smooth.func<-function(x, cont.correct){
+  smooth.mod<-smooth.spline((x[!is.na(x)]), spar=0.5)
+  ODsm= smooth.mod$y
+  deriv = predict(smooth.mod, deriv=1)$y
+  deriv2 = predict(smooth.mod, deriv=2)$y
+
+  out.df= cbind.data.frame('ODsm'=ODsm,'deriv'=deriv,'deriv2'=deriv2)
+  return(out.df)
+}
+
+
+a2 <- a1.m %>%
+    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+  filter(!is.na(OD)) %>%
+    mutate(smoothvals = smooth.func(OD) ) %>%
+tidyr::unpack(., cols=smoothvals)
+
+
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Recipient)) +
+  geom_line()+
+  geom_line(data=a2,aes(x=t, y=ODsm, group=ID, color='gray'))+
+  theme_classic() +
+  facet_wrap(~Donor)
+
+p1
+```
+
+Plot of smoothed values
+```{r}
+p1 <- ggplot(a2, aes(x=t, y=(ODsm), group=ID, color=Donor)) +
+  geom_line()+
+  theme_classic() +
+  facet_wrap(~Recipient)+
+  ggtitle('OD')
+
+ggplotly(p1)
+```
+
+Plot of derivatives. When derivative is at max, this shows when growth rate maxes out
+```{r}
+p2 <- ggplot(a2, aes(x=t, y=deriv, group=ID, color=Donor)) +
+  geom_line()+
+  theme_classic() +
+  facet_wrap(~Recipient)+
+  ggtitle('Growth rate')
+
+ggplotly(p2)
+```
+
+
+Plot of derivatives. When derivative is at max, this shows when growth rate maxes out
+```{r}
+p3 <- ggplot(a2, aes(x=t, y=deriv2, group=ID, color=Donor)) +
+  geom_line()+
+  theme_classic() +
+  facet_wrap(~Recipient)+
+  ggtitle('Change in growth rate')
+
+ggplotly(p3)
+```
+
+```{r}
+p1/p2
+```
+At what time point does max growth occur?
+```{r}
+max.deriv.time <- a2 %>%
+    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+   summarize( t_max_deriv = t[which(deriv==max(deriv, na.rm=T)) ] ) %>%
+  mutate(label= paste(Recipient, Donor ))
+  max.deriv.time
+  
+  ggplot(max.deriv.time , aes(x=label, y=t_max_deriv))+
+    geom_jitter(width=0.1, height=0)+
+    theme_classic() +
+    ylab('Time of max growth rate')
+```
+
+
