@@ -19,7 +19,7 @@ library(plotly)
 Read in the data
 
 ```{r}
-a1 <- read_xlsx('./Data/Growth_Curve_Summary_2023.xlsx')
+a1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V1.xlsx')
 ```
 
 ```{r}
@@ -28,34 +28,40 @@ names(a1)
 
 reshape to long format
 ```{r}
-a1.m <- reshape2::melt(a1, id.vars=c('ID','Recipient','Donor','Clone_N','Rep')) %>%
-  arrange(ID,Recipient, Donor, Clone_N,Rep, value) %>%
-  group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep')) %>%
+  arrange(ID,Background, Serotype, Clone_N,Rep, value) %>%
+  group_by(ID,Background, Serotype, Clone_N,Rep) %>%
   mutate( index= row_number() -1,  
           t= index/2,
           t0=min(value, na.rm=T),
-          OD= value - t0 )  %>%
+          OD= value - t0,
+          ID2 = paste(ID, Rep, sep='_'),
+          Serotype= if_else(Serotype=='8C','18C',Serotype ),
+          Serotype= if_else(Serotype=='15B/C','15BC',Serotype ),
+          Serotype= if_else(Serotype=='9A','19A',Serotype ))  %>%
+  filter(t<=20 & Background %in% c('15BC','22F')) %>%
   ungroup()
 ```
 
 
-Group by recipient, color by donor
+Group by Background, color by Serotype
 
 ```{r}
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Donor)) +
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Serotype)) +
   geom_line()+
   theme_classic() +
-  facet_wrap(~Recipient)
+  facet_wrap(~Background)
 
 p1
+ggplotly(p1)
 ```
-Group by Donor, color by recipient
+Group by Serotype, color by Background
 
 ```{r}
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Recipient)) +
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Background)) +
   geom_line()+
   theme_classic() +
-  facet_wrap(~Donor)
+  facet_wrap(~Serotype)
 
 p1
 ```
@@ -64,7 +70,7 @@ p1
 
 ```{r}
 max.od <- a1.m %>%
-    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+    group_by(ID2,Background, Serotype, Clone_N,Rep) %>%
     summarize( max_od=max(OD, na.rm=T))
 
 max.od
@@ -86,27 +92,27 @@ smooth.func<-function(x, cont.correct){
 
 
 a2 <- a1.m %>%
-    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
+    group_by(ID,Background, Serotype, Clone_N,Rep) %>%
   filter(!is.na(OD)) %>%
     mutate(smoothvals = smooth.func(OD) ) %>%
 tidyr::unpack(., cols=smoothvals)
 
 
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID, color=Recipient)) +
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Background)) +
   geom_line()+
-  geom_line(data=a2,aes(x=t, y=ODsm, group=ID, color='gray'))+
+  geom_line(data=a2,aes(x=t, y=ODsm, group=ID2, color='gray'))+
   theme_classic() +
-  facet_wrap(~Donor)
+  facet_wrap(~Serotype)
 
 p1
 ```
 
 Plot of smoothed values
 ```{r}
-p1 <- ggplot(a2, aes(x=t, y=(ODsm), group=ID, color=Donor)) +
+p1 <- ggplot(a2, aes(x=t, y=(ODsm), group=ID2, color=Serotype)) +
   geom_line()+
   theme_classic() +
-  facet_wrap(~Recipient)+
+  facet_wrap(~Background)+
   ggtitle('OD')
 
 ggplotly(p1)
@@ -114,10 +120,10 @@ ggplotly(p1)
 
 Plot of derivatives. When derivative is at max, this shows when growth rate maxes out
 ```{r}
-p2 <- ggplot(a2, aes(x=t, y=deriv, group=ID, color=Donor)) +
+p2 <- ggplot(a2, aes(x=t, y=deriv, group=ID2, color=Serotype)) +
   geom_line()+
   theme_classic() +
-  facet_wrap(~Recipient)+
+  facet_wrap(~Background)+
   ggtitle('Growth rate')
 
 ggplotly(p2)
@@ -126,10 +132,10 @@ ggplotly(p2)
 
 Plot of derivatives. When derivative is at max, this shows when growth rate maxes out
 ```{r}
-p3 <- ggplot(a2, aes(x=t, y=deriv2, group=ID, color=Donor)) +
+p3 <- ggplot(a2, aes(x=t, y=deriv2, group=ID2, color=Serotype)) +
   geom_line()+
   theme_classic() +
-  facet_wrap(~Recipient)+
+  facet_wrap(~Background)+
   ggtitle('Change in growth rate')
 
 ggplotly(p3)
@@ -141,15 +147,194 @@ p1/p2
 At what time point does max growth occur?
 ```{r}
 max.deriv.time <- a2 %>%
-    group_by(ID,Recipient, Donor, Clone_N,Rep) %>%
-   summarize( t_max_deriv = t[which(deriv==max(deriv, na.rm=T)) ] ) %>%
-  mutate(label= paste(Recipient, Donor ))
+    group_by(ID2,Background, Serotype, Clone_N,Rep) %>%
+   summarize( t_max_deriv = t[which(deriv==max(deriv, na.rm=T)) ], max_deriv=max(deriv, na.rm=T) ) %>%
+  mutate(label= paste(Background, Serotype ))
   max.deriv.time
   
   ggplot(max.deriv.time , aes(x=label, y=t_max_deriv))+
     geom_jitter(width=0.1, height=0)+
     theme_classic() +
-    ylab('Time of max growth rate')
+    ylab('Time of max growth rate')+
+     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 ```
+
+## Compare time of max growth rate and max OD
+```{r}
+comp1 <- max.deriv.time %>%
+  ungroup() %>%
+  select(ID2, t_max_deriv, max_deriv) %>%
+  left_join(max.od, by='ID2')%>%
+  mutate( Serotype=as.factor(Serotype), 
+          Serotype= relevel(Serotype, '15BCdeltacps'))
+
+
+ggplot(comp1, aes(x=max_od, y=t_max_deriv))+
+  geom_point() +
+  theme_classic()+
+  ggtitle('Time when reach max growth rate vs max density')
+
+
+ggplot(comp1, aes(x=max_od, y=max_deriv))+
+  geom_point() +
+  theme_classic()+
+  ggtitle('Max growth rate vs max density')
+
+```
+
+
+```{r}
+
+mod1 <- lm(max_od ~ Serotype + Background ,   data=comp1)
+
+summary(mod1)
+
+coefs1 <- as.data.frame(coef(mod1)) %>%
+  mutate(st= names(coef(mod1)),
+         st= gsub('Serotype','',st)) %>%
+  rename('beta'= 'coef(mod1)') %>%
+  arrange(beta) %>%
+  mutate( index=row_number())
+  filter(st != '(Intercept)' & st != 'Background22F' )
+
+ggplot(coefs1, aes(x=index, y=beta, label=st)) +
+  geom_point() +
+  theme_minimal() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0)
+
+```
+
+
+## modification 1: first subtract complemented serotype, so center around 0
+
+No intercept or further adjustment for background
+```{r}
+View(comp1)
+
+complemented_max_od <- comp1 %>%
+  mutate(complement = if_else(Background==Serotype,1,0)) %>%
+  filter(complement==1) %>%
+  group_by(Background) %>%
+  summarize(max_od_comp = mean(max_od))
+
+comp2 <- comp1 %>%
+  left_join(complemented_max_od, by='Background') %>%
+  mutate(adj_max_od = max_od / max_od_comp)
+
+
+ggplot(comp2, aes(x=Serotype, y=adj_max_od, color=Background)) +
+  geom_point() +
+  theme_classic()+
+         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+mod1 <- lm(adj_max_od ~ 0 + Serotype ,   data=comp2)
+
+summary(mod1)
+
+
+coefs1 <- as.data.frame(coef(mod1)) %>%
+  mutate(st= names(coef(mod1)),
+         st= gsub('Serotype','',st)) %>%
+  rename('beta'= 'coef(mod1)') %>%
+  arrange(beta) %>%
+  mutate( index=row_number()) %>%
+  filter(st != '(Intercept)' & st != 'Background22F' )
+
+ggplot(coefs1, aes(x=index, y=beta, label=st)) +
+  geom_point() +
+  theme_minimal() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0)
+
+```
+
+Allow effect of serotype to vary by background
+
+```{r}
+
+comp2 <- 
+mod2 <- lm(adj_max_od ~ 0 + Serotype*Background ,   data=comp2)
+
+summary(mod2)
+
+mod2.coef <- coef(mod2)
+
+st.eff.back15bc <- cbind.data.frame('beta1' =mod2.coef[-grep('Background', names(mod2.coef))])%>%
+  mutate(st =rownames(.) ) %>%
+  filter(!(st %in% c('Serotype22Fdeltacps', 'Serotype22Fwt')))
+
+
+
+st.eff.back22f.marg <-  cbind.data.frame('beta2' =mod2.coef[grep('Background', names(mod2.coef))]) %>%
+  mutate(st = gsub(':Background22F','',rownames(.)))
+
+comb.effect <- st.eff.back15bc %>%
+  left_join(st.eff.back22f.marg, by='st') %>%
+  mutate(beta_back15bc = beta1,
+         beta_back22f = beta1 + beta2) %>%
+  arrange(beta_back15bc) %>%
+  mutate(order=row_number(),
+         st=gsub('Serotype','', st))
+
+ggplot(comb.effect, aes(x=order, y=beta_back15bc, label=st)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0)
+
+
+ggplot(comb.effect, aes(x=beta_back22f, y=beta_back15bc, label=st)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0)
+
+
+ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/PS%20Composition_SS_final.csv') %>%
+  rename(st=Serotype) %>%
+  mutate( st= if_else(st=='15B', '15BC', st)
+          ) 
+
+comb.effect2 <- comb.effect %>%
+  left_join(ps1, by='st') %>%
+  mutate(any_gal = if_else(Gal == 1 | GalA==1,1,0),
+         NAC = if_else(GlcNAc==1 | GalNAc==1 | ManNAc==1 |  ManNAcA==1 |FucNAc==1 |PneNAc ==1,1,0 ),
+         uronic= if_else(GalA==1 | GlcA==1,1,0),
+         Gal = ifelse(st=='23A', 1, Gal) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Rha = ifelse(st=='23A', 1, Rha) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Gro = ifelse(st=='23A', 1, Gro) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+               
+         Rha = ifelse(st=='7C', 1, Rha) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         NAC = ifelse(st=='7C', 1, NAC) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         
+
+  )
+
+ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0)
+
+
+mod1 <- lm(beta_back15bc ~ beta_back22f + any_gal + Rha, data=comb.effect2)
+summary(mod1)
+
+mod1 <- lm(beta_back15bc ~ beta_back22f +  Rha, data=comb.effect2)
+summary(mod1)
+
+mod1 <- lm(beta_back15bc ~ beta_back22f + NAC, data=comb.effect2)
+summary(mod1)
+
+mod1 <- lm(beta_back15bc ~ beta_back22f + uronic, data=comb.effect2)
+summary(mod1)
+
+
+
+
+```
+
 
 
