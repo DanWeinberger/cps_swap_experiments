@@ -19,7 +19,8 @@ library(plotly)
 Read in the data
 
 ```{r}
-a1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V1.xlsx')
+a1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V1.xlsx') %>%
+  mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background))
 ```
 
 ```{r}
@@ -153,7 +154,7 @@ max.deriv.time <- a2 %>%
   max.deriv.time
   
   ggplot(max.deriv.time , aes(x=label, y=t_max_deriv))+
-    geom_jitter(width=0.1, height=0)+
+    geom_jitter(width=0.1, height=0, alpha=0.5)+
     theme_classic() +
     ylab('Time of max growth rate')+
      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
@@ -206,7 +207,7 @@ ggplot(coefs1, aes(x=index, y=beta, label=st)) +
 ```
 
 
-## modification 1: first subtract complemented serotype, so center around 0
+## modification 1: first divide by complemented serotype, so center around 1
 
 No intercept or further adjustment for background
 ```{r}
@@ -229,7 +230,7 @@ ggplot(comp2, aes(x=Serotype, y=adj_max_od, color=Background)) +
          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 
-mod1 <- lm(adj_max_od ~ 0 + Serotype ,   data=comp2)
+mod1 <- lm(adj_max_od ~ 1 + Serotype ,   data=comp2)
 
 summary(mod1)
 
@@ -254,8 +255,7 @@ Allow effect of serotype to vary by background
 
 ```{r}
 
-comp2 <- 
-mod2 <- lm(adj_max_od ~ 0 + Serotype*Background ,   data=comp2)
+mod2 <- lm(adj_max_od ~ 1 + Serotype*Background ,   data=comp2)
 
 summary(mod2)
 
@@ -316,7 +316,11 @@ ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha)) 
   geom_point() +
   theme_classic() +
        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(hjust=0, vjust=0)
+  geom_text(hjust=0, vjust=0) +
+  ylim(0.1,1.8)+
+  xlim(0.1,1.8)+
+  geom_vline(xintercept=1) +
+  geom_hline(yintercept=1) 
 
 
 mod1 <- lm(beta_back15bc ~ beta_back22f + any_gal + Rha, data=comb.effect2)
