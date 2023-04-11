@@ -14,6 +14,7 @@ library(readxl)
 library(patchwork)
 library(reshape2)
 library(plotly)
+library(MASS)
 ```
 
 Read in the data
@@ -195,7 +196,7 @@ coefs1 <- as.data.frame(coef(mod1)) %>%
          st= gsub('Serotype','',st)) %>%
   rename('beta'= 'coef(mod1)') %>%
   arrange(beta) %>%
-  mutate( index=row_number())
+  mutate( index=row_number()) %>%
   filter(st != '(Intercept)' & st != 'Background22F' )
 
 ggplot(coefs1, aes(x=index, y=beta, label=st)) +
@@ -339,6 +340,97 @@ summary(mod1)
 
 
 ```
+## Bring in carriage and CFR and invasiveness data
+```{r}
+# carr1 <- read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/carr%20data.csv') %>%
+#   rename(st=ST) %>%
+#   mutate(st = if_else(st=='6A/C', '6A',st),
+#          st = if_else(st %in% c('15B','15C'), '15BC',st))%>%
+#   group_by(st) %>%
+#   summarize(SLEEMANCARRN=sum(SLEEMANCARRN),
+#             NORWAYCARR_PRE=sum(NORWAYCARR_PRE),
+#             MASSCARR01=sum(MASSCARR01),
+#             GREECECARRN=sum(GREECECARRN))
+
+#from Løchen A, Truscott JE, Croucher NJ.PLOS COMP Biol 2022
+carr1 <- read.csv('https://raw.githubusercontent.com/nickjcroucher/progressionEstimation/main/data-raw/S_pneumoniae_infant_serotype.csv') %>%
+  rename(st=type) %>%
+  mutate(st = if_else(st=='15B/C','15BC', st),
+         post_period =sub("^[^.]*\\.\\s*", "", study),
+    post_period= if_else(post_period=='W.pre.PCV','pre.PCV',post_period),
+         vt=if_else(post_period=='post.PCV7' & st %in% c('4','6B','9V','14','18C','19F','23F'),1,
+                 if_else(post_period=='post.PCV10' & st %in% c('4','6B','9V','14','18C','19F','23F','1','5','7F'),1,
+                 if_else(post_period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))) 
+
+carr2 <- comb.effect2 %>%
+  right_join(carr1, by='st') %>%
+  group_by(study) %>%
+  mutate(carr_prop= carriage/sum(carriage),
+         ipd_prop=disease/sum(disease))
+
+ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st)) +
+  geom_point() +
+   geom_text() +
+  theme_classic()
+
+ggplot(carr2, aes(x=beta_back15bc, y=carr_prop , label=st)) +
+  geom_point() +
+   geom_text() +
+  theme_classic()
+
+mod1 <- glm.nb(carriage ~ beta_back15bc +study + vt , data=carr2)
+summary(mod1)
+
+mod1 <- glm.nb(carriage ~ beta_back22f +study +vt, data=carr2)
+summary(mod1)
+
+```
+carriage, invasiveness vs rhamnose or others
+```{r}
+
+carr_ps1 <- carr1 %>%
+  left_join(ps1, by='st')
+
+mod1 <- glm.nb(carriage ~ Rha +GlcA +study +vt, data=carr_ps1)
+summary(mod1)
+
+
+mod1 <- glm.nb(carriage ~ GlcNAc +study +vt, data=carr_ps1)
+summary(mod1)
+
+```
+
+regular NegBin
+```{r}
+
+carr_ps2 <- carr_ps1 %>%
+  filter(!is.na(GlcA))
+
+mod1 <- glm.nb(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha ,  data=carr_ps2)
+
+summary(mod1)
+```
+
+lasso
+```{r}
+library(mpath)
+
+#PCV
+mod1.reg <- cv.glmregNB(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha , alpha=0.99, data=carr_ps2,parallel=T)
+optim.lambda <- mod1.reg$lambda.optim
+
+plot(mod1.reg)
+abline(v=log(optim.lambda))
+summary(mod1.reg)
+
+
+
+mod2.reg <- glmregNB(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha , lambda=exp(-3), alpha=0.99, data=carr_ps2,parallel=T)
+
+mod2.reg$beta
+```
+
+
 
 
 
