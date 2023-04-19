@@ -20,7 +20,7 @@ library(MASS)
 Read in the data
 
 ```{r}
-a1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V1.xlsx') %>%
+a1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V2.xlsx') %>%
   mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background))
 ```
 
@@ -165,7 +165,7 @@ max.deriv.time <- a2 %>%
 ```{r}
 comp1 <- max.deriv.time %>%
   ungroup() %>%
-  select(ID2, t_max_deriv, max_deriv) %>%
+  dplyr::select(ID2, t_max_deriv, max_deriv) %>%
   left_join(max.od, by='ID2')%>%
   mutate( Serotype=as.factor(Serotype), 
           Serotype= relevel(Serotype, '15BCdeltacps'))
@@ -184,10 +184,23 @@ ggplot(comp1, aes(x=max_od, y=max_deriv))+
 
 ```
 
+```{r}
+ggplot(comp1, aes(x=Serotype, y=max_od, color=Background))+
+  geom_point() +
+  theme_classic()+
+  ggtitle('Max density by serotype')+
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+look at difference between genetic background (how doe affect of serotype vary by background)
 
 ```{r}
 
-mod1 <- lm(max_od ~ Serotype + Background ,   data=comp1)
+comp1a <- comp1 %>%
+  filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+
+mod1 <- lm(max_od ~ Serotype + Background + Serotype * Background ,   data=comp1a)
 
 summary(mod1)
 
@@ -196,14 +209,16 @@ coefs1 <- as.data.frame(coef(mod1)) %>%
          st= gsub('Serotype','',st)) %>%
   rename('beta'= 'coef(mod1)') %>%
   arrange(beta) %>%
-  mutate( index=row_number()) %>%
-  filter(st != '(Intercept)' & st != 'Background22F' )
+  filter(st != '(Intercept)'  & grepl(':Background22F', st) ) %>%
+  mutate( index=row_number()) 
+
 
 ggplot(coefs1, aes(x=index, y=beta, label=st)) +
   geom_point() +
   theme_minimal() +
        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(hjust=0, vjust=0)
+  geom_text(hjust=0, vjust=0) +
+  ggtitle('Interaction of ST and background')
 
 ```
 
@@ -256,7 +271,10 @@ Allow effect of serotype to vary by background
 
 ```{r}
 
-mod2 <- lm(adj_max_od ~ 1 + Serotype*Background ,   data=comp2)
+comp2a <- comp2 %>%
+    filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+
+mod2 <- lm(adj_max_od ~ 0 + Serotype*Background ,   data=comp2a)
 
 summary(mod2)
 
@@ -318,10 +336,11 @@ ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha)) 
   theme_classic() +
        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
   geom_text(hjust=0, vjust=0) +
-  ylim(0.1,1.8)+
-  xlim(0.1,1.8)+
-  geom_vline(xintercept=1) +
-  geom_hline(yintercept=1) 
+ ylim(0,1.8)+
+  xlim(0,1.8)+
+  geom_vline(xintercept=0) +
+  geom_hline(yintercept=0) +
+  geom_abline(intercept=0, slope=1)
 
 
 mod1 <- lm(beta_back15bc ~ beta_back22f + any_gal + Rha, data=comb.effect2)
@@ -366,8 +385,11 @@ carr2 <- comb.effect2 %>%
   right_join(carr1, by='st') %>%
   group_by(study) %>%
   mutate(carr_prop= carriage/sum(carriage),
-         ipd_prop=disease/sum(disease))
+         ipd_prop=disease/sum(disease),
+         case_carr= (disease+0.5)/(carriage+0.5)
+  )
 
+## Carriage
 ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st)) +
   geom_point() +
    geom_text() +
@@ -378,11 +400,41 @@ ggplot(carr2, aes(x=beta_back15bc, y=carr_prop , label=st)) +
    geom_text() +
   theme_classic()
 
-mod1 <- glm.nb(carriage ~ beta_back15bc +study + vt , data=carr2)
-summary(mod1)
+##case carrier
+ggplot(carr2, aes(x=beta_back22f, y=case_carr , label=st)) +
+  geom_point() +
+   geom_text() +
+  theme_classic()
 
-mod1 <- glm.nb(carriage ~ beta_back22f +study +vt, data=carr2)
-summary(mod1)
+ggplot(carr2, aes(x=beta_back15bc, y=case_carr , label=st)) +
+  geom_point() +
+   geom_text() +
+  theme_classic()
+```
+
+
+```{r}
+##Carriage
+mod1a <- glm.nb(carriage ~ beta_back15bc +study + vt , data=carr2)
+summary(mod1a)
+
+mod1b <- glm.nb(carriage ~ beta_back22f +study +vt, data=carr2)
+summary(mod1b)
+
+#IPD
+mod2 <- glm.nb(disease ~ beta_back15bc +study + vt , data=carr2)
+summary(mod2)
+
+mod2 <- glm.nb(disease ~ beta_back22f +study + vt , data=carr2)
+summary(mod2)
+
+
+#case:carrier ratio
+mod3 <- lm(case_carr ~ beta_back15bc +study + vt , data=carr2)
+summary(mod3)
+
+mod3 <- lm(case_carr ~ beta_back22f +study + vt , data=carr2)
+summary(mod3)
 
 ```
 carriage, invasiveness vs rhamnose or others
@@ -410,6 +462,28 @@ mod1 <- glm.nb(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha ,  data=
 
 summary(mod1)
 ```
+
+
+what if we do hold out (for PCV13)?
+```{r}
+carr_ps2 <- carr_ps1 %>%
+  filter(!is.na(GlcA)) %>%
+ mutate( carr_nonpcv13 = ifelse(post_period != 'post.PCV13',carriage, NA_real_))
+
+mod1 <- glm.nb(carr_nonpcv13 ~  vt + GlcA + GalA+ GlcNAc + GalNAc+Rha ,  data=carr_ps2)
+
+summary(mod1)
+
+predict.holdout = carr_ps2 %>%
+  mutate(pred1 = predict(mod1, type='response', newdata=carr_ps2)) %>%
+  filter(is.na(carr_nonpcv13))
+
+ggplot(predict.holdout, aes(x=pred1, y=carriage, label=st)) +
+  #geom_point() +
+  theme_classic()+
+  geom_text()
+```
+
 
 lasso
 ```{r}
