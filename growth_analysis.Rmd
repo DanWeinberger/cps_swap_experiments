@@ -73,10 +73,19 @@ p1
 ```{r}
 max.od <- a1.m %>%
     group_by(ID2,Background, Serotype, Clone_N,Rep) %>%
-    summarize( max_od=max(OD, na.rm=T))
+    summarize( max_od=max(OD, na.rm=T)) %>%
+  mutate(Clone_N=as.factor(Clone_N)) 
 
 max.od
 ```
+
+```{r}
+ggplot(max.od , aes(x=Serotype, y=max_od,color=Background, shape=Clone_N))+
+  geom_point(alpha=0.5)+
+  theme_classic()+
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
 
 
 Smooth with a spline
@@ -146,6 +155,7 @@ ggplotly(p3)
 ```{r}
 p1/p2
 ```
+
 At what time point does max growth occur?
 ```{r}
 max.deriv.time <- a2 %>%
@@ -359,6 +369,7 @@ summary(mod1)
 
 
 ```
+
 ## Bring in carriage and CFR and invasiveness data
 ```{r}
 # carr1 <- read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/carr%20data.csv') %>%
