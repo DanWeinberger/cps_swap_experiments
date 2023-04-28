@@ -356,7 +356,7 @@ ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha)) 
 mod1 <- lm(beta_back15bc ~ beta_back22f + any_gal + Rha, data=comb.effect2)
 summary(mod1)
 
-mod1 <- lm(beta_back15bc ~ beta_back22f +  Rha, data=comb.effect2)
+mod1 <- lm(beta_back22f ~ beta_back15bc +  Rha, data=comb.effect2)
 summary(mod1)
 
 mod1 <- lm(beta_back15bc ~ beta_back22f + NAC, data=comb.effect2)
@@ -371,7 +371,7 @@ summary(mod1)
 ```
 
 ## Bring in carriage and CFR and invasiveness data
-```{r}
+```{r, fig.width=8, fig.height=6}
 # carr1 <- read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/carr%20data.csv') %>%
 #   rename(st=ST) %>%
 #   mutate(st = if_else(st=='6A/C', '6A',st),
@@ -386,42 +386,116 @@ summary(mod1)
 carr1 <- read.csv('https://raw.githubusercontent.com/nickjcroucher/progressionEstimation/main/data-raw/S_pneumoniae_infant_serotype.csv') %>%
   rename(st=type) %>%
   mutate(st = if_else(st=='15B/C','15BC', st),
-         post_period =sub("^[^.]*\\.\\s*", "", study),
-    post_period= if_else(post_period=='W.pre.PCV','pre.PCV',post_period),
-         vt=if_else(post_period=='post.PCV7' & st %in% c('4','6B','9V','14','18C','19F','23F'),1,
-                 if_else(post_period=='post.PCV10' & st %in% c('4','6B','9V','14','18C','19F','23F','1','5','7F'),1,
-                 if_else(post_period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))) 
+         period=substring(study, first = regexpr("\\.", study) + 1),
+         pop=sub("\\..*", "", study) 
+  )
 
-carr2 <- comb.effect2 %>%
-  right_join(carr1, by='st') %>%
-  group_by(study) %>%
+
+#fill in missing values
+carr.fill1  <- carr1  %>%
+  ungroup() %>%
+  dplyr::select(carriage, carriage_samples,period, pop, st) %>%
+  reshape2::melt(. ,id.vars=c('period','pop','st')) %>%
+  reshape2::dcast(. , st + pop ~ period + variable , value.var='value') %>%
+  filter(pop %in% c('Atlanta', 'Bogota', 'France', 'Netherlands')) %>%
+  mutate( pre.PCV_carriage = ifelse( is.na(pre.PCV_carriage) & pop %in% c('Alabama','Atlanta','Bogota', 'Caracas','Czech','E','Goroka','Morocco','Netherlands','Ontario','Portugal'), 0, pre.PCV_carriage ),
+          post.PCV7_carriage = ifelse( is.na(post.PCV7_carriage) & pop %in% c('Atlanta','Barcelona','Bogota','France','Massachusetts','Navajo','Netherlands'), 0, post.PCV7_carriage ),
+           post.PCV10_carriage = ifelse( is.na(post.PCV10_carriage) & pop %in% c('Netherlands'), 0, post.PCV10_carriage ),
+           post.PCV13_carriage = ifelse( is.na(post.PCV13_carriage) & pop %in% c('France'), 0, post.PCV13_carriage ),
+          change.post.pcv7 = ((post.PCV7_carriage+0.5)/post.PCV7_carriage_samples) /  ((pre.PCV_carriage+0.5)/pre.PCV_carriage_samples),
+          change.post.pcv13.vs.7 = (post.PCV13_carriage+0.5)/post.PCV13_carriage_samples /  ((post.PCV7_carriage+0.5)/post.PCV7_carriage_samples),
+          change.post.pcv10 = ((post.PCV10_carriage+0.5)/post.PCV10_carriage_samples)  / ((pre.PCV_carriage+0.5)/pre.PCV_carriage_samples)
+
+                  )
+
+carr_filled2 <- carr.fill1 %>%
+  dplyr::select(st, pop, post.PCV10_carriage,post.PCV13_carriage,post.PCV7_carriage,pre.PCV_carriage ) %>%
+  reshape2::melt(., id.vars=c('pop','st')) %>%
+  rename(period=variable, carriage=value) %>%
+  group_by(pop,period) %>%
+  mutate(tot_carrN=sum(carriage) , carr_prop=carriage/tot_carrN,
+         period= gsub('_carriage','',period),
+   # period= ifelse(period=='W.pre.PCV','pre.PCV',period),
+         vt=if_else(period=='post.PCV7' & st %in% c('4','6B','9V','14','18C','19F','23F'),1,
+                 if_else(period=='post.PCV10' & st %in% c('4','6B','9V','14','18C','19F','23F','1','5','7F'),1,
+                 if_else(period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))) %>%
+  filter(tot_carrN >0 & !grepl('change', period)) 
+
+carr_change <- carr.fill1 %>%
+  reshape2::melt(., id.vars=c('pop','st')) %>%
+  rename(period=variable, carriage=value) %>%
+  group_by(pop,period) %>%
+  mutate(tot_carrN=sum(carriage, na.rm=T)) %>%
+  filter(tot_carrN >0 & grepl('change', period)) %>%
+  rename(change_carr=carriage) %>%
+  dplyr::select(st,pop, period, change_carr) %>%
+  mutate(period = gsub('change.','', period))
+
+
+carr2 <- carr1 %>%
+  dplyr::select(-carriage) %>%
+  right_join(carr_filled2, by=c('st','pop','period')) %>%
+  left_join(comb.effect2, by='st') %>%
+  ungroup() %>%
+  group_by(pop, period) %>%
   mutate(carr_prop= carriage/sum(carriage),
          ipd_prop=disease/sum(disease),
          case_carr= (disease+0.5)/(carriage+0.5)
   )
 
+
 ## Carriage
-ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st)) +
+ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
+  facet_wrap(~pop+period, scales='free') +
   theme_classic()
 
-ggplot(carr2, aes(x=beta_back15bc, y=carr_prop , label=st)) +
+ggplot(carr2, aes(x=beta_back15bc, y=carr_prop , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
+  facet_wrap(~pop+period, scales='free') +
   theme_classic()
 
 ##case carrier
-ggplot(carr2, aes(x=beta_back22f, y=case_carr , label=st)) +
+ggplot(carr2, aes(x=beta_back22f, y=case_carr , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
+  facet_wrap(~study, scales='free') +
   theme_classic()
 
-ggplot(carr2, aes(x=beta_back15bc, y=case_carr , label=st)) +
+ggplot(carr2, aes(x=beta_back15bc, y=case_carr , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
+    facet_wrap(~study, scales='free') +
   theme_classic()
+
+
+#carriage change
+carr_change2 <- carr_change  %>%
+  left_join(comb.effect2, by='st') %>%
+  ungroup() %>%
+  mutate( vt=if_else(period=='post.pcv7' & st %in% c('4','6B','9V','14','18C','19F','23F'),1,
+                 if_else(period=='post.pcv13.vs.7' & st %in% c('1','5','7F'),1,
+                 if_else(period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))
+          )
+
+ggplot(carr_change2, aes(x=beta_back15bc, y=change_carr , label=st, color=as.factor(vt))) +
+  geom_point() +
+   geom_text() +
+  facet_wrap(~pop+period, scales='free') +
+  theme_classic()
+
+ggplot(carr_change2, aes(x=beta_back22f, y=change_carr , label=st, color=as.factor(vt))) +
+  geom_point() +
+   geom_text() +
+  facet_wrap(~pop+period, scales='free') +
+  theme_classic()
+
+
+
 ```
+
 
 
 ```{r}
@@ -448,11 +522,23 @@ mod3 <- lm(case_carr ~ beta_back22f +study + vt , data=carr2)
 summary(mod3)
 
 ```
+
+
+```{r}
+
+```
+
+
+
 carriage, invasiveness vs rhamnose or others
 ```{r}
 
 carr_ps1 <- carr1 %>%
-  left_join(ps1, by='st')
+  left_join(ps1, by='st') %>%
+   mutate( vt=if_else(period=='post.pcv7' & st %in% c('4','6B','9V','14','18C','19F','23F'),1,
+                 if_else(period=='post.pcv13.vs.7' & st %in% c('1','5','7F'),1,
+                 if_else(period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))
+          )
 
 mod1 <- glm.nb(carriage ~ Rha +GlcA +study +vt, data=carr_ps1)
 summary(mod1)
@@ -467,11 +553,18 @@ regular NegBin
 ```{r}
 
 carr_ps2 <- carr_ps1 %>%
-  filter(!is.na(GlcA))
+  filter(!is.na(GlcA)) %>%
+  mutate(logoffset=log(carriage_samples),
+         period=as.factor(period),
+         period = relevel(period, ref='pre.PCV'))
 
-mod1 <- glm.nb(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha ,  data=carr_ps2)
+mod1 <- glm.nb(carriage ~  vt + GlcA + GalA+ GlcNAc + GalNAc+Rha + study + offset(logoffset),  data=carr_ps2)
 
 summary(mod1)
+
+mod2 <- glm.nb(carriage ~  vt + Rha + period + Rha*period + offset(logoffset),  data=carr_ps2)
+
+summary(mod2)
 ```
 
 
