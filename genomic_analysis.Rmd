@@ -33,21 +33,68 @@ These plots represent pangenomes created based on the sequenced strains. The hea
 key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% 
   dplyr::rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
 
-g1 <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE)
+g0 <- read.table(file = './Data/Pangenome.gene.presence.absence.tsv', sep = '\t', header = TRUE) %>%
+  mutate(Cps.gene.name = if_else(is.na(Cps.gene.name), Gene.cluster, Cps.gene.name), 
+         gene_name_cluster= paste(Cps.gene.name,Gene.cluster, sep='_'))
 
-g2 <- read.table(file = './Data/Group2 gene.presence_absence.tsv', sep = '\t', header = TRUE)
+g1.labs <- read.table(file = './Data/Group1 gene.presence_absence.tsv', sep = '\t', header = TRUE) %>%
+  row.names()
 
-g3 <- read.table(file = './Data/Group3 gene.presence_absence.tsv', sep = '\t', header = TRUE)
+g2.labs <- read.table(file = './Data/Group2 gene.presence_absence.tsv', sep = '\t', header = TRUE)%>%
+  row.names()
 
-a1 <- read.table(file = './Data/Genes.with.variable.presence.patterns_with_annotations.tsv', sep = '\t', header = TRUE) %>%
+g3.labs <- read.table(file = './Data/Group3 gene.presence_absence.tsv', sep = '\t', header = TRUE)%>%
+  row.names()
+
+g1 <- g0 %>%
+  dplyr::select( gene_name_cluster, all_of(intersect(g1.labs, names(g0)))) %>%
+  reshape2::melt(., id.vars=c('gene_name_cluster')) %>%
+  reshape2::dcast(variable ~ gene_name_cluster) 
+
+row.names(g1) <- g1$variable
+g1 <- g1 %>%   select(-variable)
+
+prev_acq_g1 <- apply(g1, 2,mean)
+g1 <- g1[,prev_acq_g1>0 & prev_acq_g1<1]
+
+##same for g2
+
+g2 <- g0 %>%
+  dplyr::select( gene_name_cluster, all_of(intersect(g2.labs, names(g0)))) %>%
+  reshape2::melt(., id.vars=c('gene_name_cluster')) %>%
+  reshape2::dcast(variable ~ gene_name_cluster) 
+
+row.names(g2) <- g2$variable
+g2 <- g2 %>%   select(-variable)
+
+prev_acq_g2 <- apply(g2, 2,mean)
+g2 <- g2[,prev_acq_g2>0 & prev_acq_g2<1]
+
+##same for g3
+
+g3 <- g0 %>%
+  dplyr::select( gene_name_cluster, all_of(intersect(g3.labs, names(g0)))) %>%
+  reshape2::melt(., id.vars=c('gene_name_cluster')) %>%
+  reshape2::dcast(variable ~ gene_name_cluster) 
+
+row.names(g3) <- g3$variable
+g3 <- g3 %>%   select(-variable)
+
+prev_acq_g3 <- apply(g3, 2,mean)
+g3 <- g3[,prev_acq_g3>0 & prev_acq_g3<1]
+
+a1 <- read.table(file = './Data/Genes.with.annotations.tsv', sep = '\t', header = TRUE) %>%
+  rename(Gene=Gene.cluster) %>%
   mutate(Gene= gsub('~~~~~~','......', fixed=T, Gene ),Non.unique.Gene.name = gsub(';','',Non.unique.Gene.name,fixed=T)) %>%
   #filter(Non.unique.Gene.name!='') %>%
   arrange(Non.unique.Gene.name) %>%
   group_by(Non.unique.Gene.name) %>%
   mutate(allele = paste0(Non.unique.Gene.name,'_', row_number()),
-        ) %>%
+        Cps.Gene = if_else(Cps.gene.name!='',1,0),
+      gene_name_cluster= paste(Gene, Non.unique.Gene.name, sep='_')
+) %>%
   ungroup() %>%
-  select(allele,Cps.Gene, Gene,Non.unique.Gene.name, Sequence)
+  select(allele,Cps.Gene,gene_name_cluster, Gene,Non.unique.Gene.name,Cps.gene.name ,Sequence)
 
 p1 <- plot.func.addition(g1)
 

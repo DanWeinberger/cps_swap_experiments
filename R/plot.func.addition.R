@@ -15,11 +15,13 @@ ds2a <- ds2 %>%
 row.names(ds2a) <- ds2a$ID2
 
 ds2a.m <- reshape2::melt(ds2a, id.vars=c('new_ST','Clone','ID2')) %>%
-  left_join(a1, by=c('variable'='Gene')) %>%
-  filter(!is.na(allele)) %>%
-  mutate(value=as.numeric(value))
+  mutate(variable=as.character(variable),
+         Gene = sub("_[^_]*$", "", variable)) %>%
+  full_join(a1, by=c('Gene'='Gene')) %>%
+  mutate(value=as.numeric(value)) %>%
+ filter(!is.na(value) & !is.na(gene_name_cluster)) 
 
-ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~allele)
+ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~gene_name_cluster)
 
 rownames(ds2a.c) <- ds2a.c$ID2
 
