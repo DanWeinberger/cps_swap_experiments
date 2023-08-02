@@ -223,8 +223,8 @@ look at difference between genetic background (how doe affect of serotype vary b
 
 ```{r}
 
-comp1a <- comp1 %>%
-  filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+comp1a <- comp1 #%>%
+  #filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
 
 mod1 <- lm(max_od ~ Serotype + Background + Serotype * Background ,   data=comp1a)
 
