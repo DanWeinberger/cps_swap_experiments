@@ -219,6 +219,53 @@ ggplot(comp1, aes(x=Serotype, y=max_od, color=Background))+
 
 ```
 
+
+```{r}
+st.avg.max.od <- comp1 %>%
+  group_by(Serotype,Background) %>%
+  summarize(max_od = mean(max_od, na.rm=T)) %>%
+  rename(st=Serotype) %>%
+  ungroup() %>%
+  reshape2::dcast(.,st~Background, value.var='max_od') %>%
+  rename(Back15BC=`15BC`, Back22F=`22F`)
+
+ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/PS%20Composition_SS_final.csv') %>%
+  rename(st=Serotype) %>%
+  mutate( st= if_else(st=='15B', '15BC', st)
+          ) 
+
+comp_od <- st.avg.max.od %>%
+  left_join(ps1, by='st') %>%
+  mutate(any_gal = if_else(Gal == 1 | GalA==1,1,0),
+         NAC = if_else(GlcNAc==1 | GalNAc==1 | ManNAc==1 |  ManNAcA==1 |FucNAc==1 |PneNAc ==1,1,0 ),
+         uronic= if_else(GalA==1 | GlcA==1,1,0),
+         Gal = ifelse(st=='23A', 1, Gal) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Rha = ifelse(st=='23A', 1, Rha) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Gro = ifelse(st=='23A', 1, Gro) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+               
+         Rha = as.factor(ifelse(st=='7C', 1, Rha)) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         NAC = ifelse(st=='7C', 1, NAC) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         Rha2 = if_else(Rha=='1', 'Yes', 
+                        if_else(Rha=='0','No', 'Unk'))
+
+  )
+
+ggplot(comp_od, aes(x=Back22F, y=Back15BC, label=st, color=Rha2)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0) +
+ ylim(0,0.5)+
+  xlim(0,0.5)+
+  geom_vline(xintercept=0) +
+  geom_hline(yintercept=0) +
+  geom_abline(intercept=0, slope=1) +
+  xlab('Max OD 22F Background') +
+  ylab('Max OD 15B/C Background') +
+    scale_color_manual(values=c("#8da0cb", "#fc8d62")) +
+   guides(color=guide_legend(title="Rha"))
+```
+
 look at difference between genetic background (how doe affect of serotype vary by background)
 
 ```{r}
