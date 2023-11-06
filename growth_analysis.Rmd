@@ -29,7 +29,9 @@ a1c <- read_xlsx('./Data/Final Growth Curve Summary Data (101723).xlsx', sheet='
   mutate(Background=Serotype)
 
 a1 <- bind_rows(a1a,a1b,a1c) %>%
-  mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background))
+  mutate(Serotype=gsub('\u2206cps', 'deltacps', Serotype),
+         Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background),
+         )
 
 #e1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V2a.xlsx', sheet='ELISA analysis')
 ```
@@ -363,7 +365,8 @@ st.eff.back22f.marg <-  cbind.data.frame('beta2' =mod2.coef[grep('Background', n
 comb.effect <- st.eff.back15bc %>%
   left_join(st.eff.back22f.marg, by='st') %>%
   mutate(beta_back15bc = beta1,
-         beta_back22f = if_else(st=='Serotype11A',beta2.background22F, beta1 + beta2)) %>%
+         beta_back22f = beta1 + beta2) %>%
+      #   beta_back22f = if_else(st=='Serotype11A',beta2.background22F, beta1 + beta2)) %>%
   arrange(beta_back15bc) %>%
   mutate(order=row_number(),
          st=gsub('Serotype','', st))
