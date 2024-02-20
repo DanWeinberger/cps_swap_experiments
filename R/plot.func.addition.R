@@ -1,4 +1,3 @@
-key1 <-  read.table(file = './Data/Strain.clone.info.tsv', sep = '\t', header = TRUE) %>% dplyr::rename(parent_ST=ID, new_ST=Strain , strain=Hartwell)
 
 #are any genes added vs reference? 
 
@@ -15,11 +14,13 @@ ds2a <- ds2 %>%
 row.names(ds2a) <- ds2a$ID2
 
 ds2a.m <- reshape2::melt(ds2a, id.vars=c('new_ST','Clone','ID2')) %>%
-  left_join(a1, by=c('variable'='Gene')) %>%
-  filter(!is.na(allele)) %>%
-  mutate(value=as.numeric(value))
+  left_join(a1, by=c('variable'='Gene.cluster2')) %>%
+  filter(!is.na(variable)) %>%
+  rename(Gene.cluster2=variable)  %>%
+  mutate(value=as.numeric(value)) %>%
+  filter(!is.na(value))
 
-ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~allele)
+ds2a.c <- reshape2::dcast(ds2a.m, new_ST +Clone +ID2~Gene.cluster2)
 
 rownames(ds2a.c) <- ds2a.c$ID2
 
@@ -28,7 +29,7 @@ mat1 <- ds2a.c %>%
   as.matrix() 
 
 
-ref <- mat1[is.na(ds2a.c$new_ST) ,]
+ref <- mat1[grep('cps',ds2a.c$new_ST) ,]
 
 #is it discordant from reference?
 #if they are equal, it returns 0, if present in x and absent in ref 1, if lost between ref and x =-1

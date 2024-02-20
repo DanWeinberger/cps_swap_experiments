@@ -5,6 +5,11 @@ date: '2023-03-24'
 output: html_document
 ---
 
+I have a column for “Clone” (the number reflects the actual clone label in the freezer) but it is not included in the naming/ID of the strain in this excel spreadsheet because we only have one of each (there are no biological replicates here), so essentially you can ignore that column.
+15B/C is labelled like this with the “/” in it, if that doesn’t work for your code just take out the “/” and it will be labelled as 15BC.
+The strain IDs are like this 22F_3(1) which corresponds to 22F::3 (Rep1) – I used “_” instead of “::” because I seem to remember that was better for the code (but it can of course be changed very easily).
+There are 3 tabs, one for donors, one for 15B/C switches and one for 22F switches, the WT and ∆cps are included on the respective switch tab (and the Donor 15B/C is the same data as the 15B/C WT but I have included it in both tabs to hopefully make the analysis easier). All have 9 replicates except donor 23 which is missing Rep 8 (because there was an error with the dilution of that sample).
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(dplyr)
@@ -20,18 +25,20 @@ library(MASS)
 Read in the data
 
 ```{r}
+a1a <- read_xlsx('./Data/Growth Curve Summary 020924 DAN.xlsx', sheet="Donors Raw")
 
-a1a <- read_xlsx('./Data/Final Growth Curve Summary Data (101723).xlsx', sheet='15BC Summary', skip=1)
+a1b <- read_xlsx('./Data/Growth Curve Summary 020924 DAN.xlsx', sheet="15BC cps switches Raw")
 
-a1b <- read_xlsx('./Data/Final Growth Curve Summary Data (101723).xlsx', sheet='22F Summary')
+a1c <- read_xlsx('./Data/Growth Curve Summary 020924 DAN.xlsx', sheet="22F cps switches Raw")
+  
+  
+  a1 <- bind_rows(a1a, a1b,a1c) %>%
+          mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background),
+              Serotype=gsub('\u2206cps', 'deltacps', Serotype))
 
-a1c <- read_xlsx('./Data/Final Growth Curve Summary Data (101723).xlsx', sheet='Donors Summary') %>%
-  mutate(Background=Serotype)
 
-a1 <- bind_rows(a1a,a1b,a1c) %>%
-  mutate(Serotype=gsub('\u2206cps', 'deltacps', Serotype),
-         Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background),
-         )
+
+
 
 #e1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V2a.xlsx', sheet='ELISA analysis')
 ```
@@ -52,7 +59,8 @@ a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep
           OD=if_else(value>=0, value, 0),
           ID2 = paste(ID, Rep, sep='_'),
           Serotype= if_else(Serotype=='8C','18C',Serotype ),
-          Serotype= if_else(Serotype=='15B/C','15BC',Serotype ),
+          Background= if_else(Background=='15B/C','15BC',Background ),
+                    Serotype= if_else(Serotype=='15B/C','15BC',Serotype ),
           Serotype= if_else(Serotype=='9A','19A',Serotype ))  %>%
      mutate( Strain_cat = if_else( grepl("22F_1\\(", ID), 'Donor'  ,
                                 if_else( grepl("15BC_15BC_1\\(", ID), '15BC'  ,
@@ -60,7 +68,7 @@ a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep
                                 if_else(Background=='15BC', '15BC',
                                   if_else(Background=='22F', '22F', 
                                     if_else(Serotype==Background , 'Donor','Other'))))))) %>%
-  filter(t<=21) %>% 
+  filter(t<=24 & Background %in% c('15BC','22F', 'Donor')) %>%
   ungroup()
 ```
 
@@ -97,25 +105,9 @@ p1
 subset
 ```{r, fig.width=14, fig.height=8}
 
- a1.m %>%
-   filter(Background %in% c('15BC','22F')) %>%
-  filter( Serotype %in% c( '14', '15BC','16F','18C','19A','23A','24F','35B','35F','3','6C','7C','7F','8','9V')) %>%
- ggplot( aes(x=t, y=OD, group=ID2, color=Strain_cat)) +
-  geom_line()+
-  theme_classic() +
-  facet_wrap(~Serotype, ncol=5)+
-  theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"))+
-  theme(strip.text.x = element_text(size = 12))
-
-```
-
-subset, show donors
-```{r, fig.width=14, fig.height=8}
-
- a1.m %>%
-   filter(Serotype==Background | Background %in% c('15BC','22F')) %>%
- ggplot( aes(x=t, y=OD, group=ID2, color=Strain_cat)) +
+a1.m %>%
+  filter( Serotype %in% c( '1','11A', '22F','33F','12F','5','14', '15BC','16F','18C','19A','23A','24F','35B','35F','3','6C','7C','7F','8','9V')) %>%
+ ggplot( aes(x=t, y=OD, group=ID2, color=Background)) +
   geom_line()+
   theme_classic() +
   facet_wrap(~Serotype, ncol=5)+
@@ -236,9 +228,9 @@ comp1 <- max.deriv.time %>%
   ungroup() %>%
   dplyr::select(ID2, t_max_deriv, max_deriv) %>%
   left_join(max.od, by='ID2')%>%
-  mutate( Serotype=as.factor(Serotype), 
-          Serotype= relevel(Serotype, 'deltacps')) %>%
-     filter(Background %in% c('15BC','22F') & !grepl("15BC_1\\(", ID2)) 
+  mutate( Serotype = if_else(Serotype=='∆cps', 'deltacps', Serotype),
+       Serotype=as.factor(Serotype), 
+          Serotype= relevel(Serotype, 'deltacps'))
 
 
 
@@ -264,12 +256,59 @@ ggplot(comp1, aes(x=Serotype, y=max_od, color=Background))+
 
 ```
 
+
+```{r}
+st.avg.max.od <- comp1 %>%
+  group_by(Serotype,Background) %>%
+  summarize(max_od = mean(max_od, na.rm=T)) %>%
+  rename(st=Serotype) %>%
+  ungroup() %>%
+  reshape2::dcast(.,st~Background, value.var='max_od') %>%
+  rename(Back15BC=`15BC`, Back22F=`22F`)
+
+ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/PS%20Composition_SS_final.csv') %>%
+  rename(st=Serotype) %>%
+  mutate( st= if_else(st=='15B', '15BC', st)
+          ) 
+
+comp_od <- st.avg.max.od %>%
+  left_join(ps1, by='st') %>%
+  mutate(any_gal = if_else(Gal == 1 | GalA==1,1,0),
+         NAC = if_else(GlcNAc==1 | GalNAc==1 | ManNAc==1 |  ManNAcA==1 |FucNAc==1 |PneNAc ==1,1,0 ),
+         uronic= if_else(GalA==1 | GlcA==1,1,0),
+         Gal = ifelse(st=='23A', 1, Gal) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Rha = ifelse(st=='23A', 1, Rha) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Gro = ifelse(st=='23A', 1, Gro) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+               
+         Rha = as.factor(ifelse(st=='7C', 1, Rha)) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         NAC = ifelse(st=='7C', 1, NAC) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         Rha2 = if_else(Rha=='1', 'Yes', 
+                        if_else(Rha=='0','No', 'Unk'))
+
+  )
+
+ggplot(comp_od, aes(x=Back22F, y=Back15BC, label=st, color=Rha2)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0) +
+ ylim(0,0.5)+
+  xlim(0,0.5)+
+  geom_vline(xintercept=0) +
+  geom_hline(yintercept=0) +
+  geom_abline(intercept=0, slope=1) +
+  xlab('Max OD 22F Background') +
+  ylab('Max OD 15B/C Background') +
+    scale_color_manual(values=c("#8da0cb", "#fc8d62")) +
+   guides(color=guide_legend(title="Rha"))
+```
+
 look at difference between genetic background (how doe affect of serotype vary by background)
 
 ```{r}
 
-comp1a <- comp1 %>%
-  filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+comp1a <- comp1 #%>%
+  #filter(Serotype %in% c(Serotype %in% c( '1','11A', '22F','33F','12F','5','14', '15BC','16F','18C','19A','23A','24F','35B','35F','3','6C','7C','7F','8','9V'))) #serotypes with both backgrounds
 
 mod1 <- lm(max_od ~ Serotype + Background + Serotype * Background ,   data=comp1a)
 
@@ -343,9 +382,10 @@ Allow effect of serotype to vary by background
 ```{r, fig.width=4, fig.height=3.5}
 
 comp2a <- comp2 %>%
-    filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','33F','35F','35B','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+  filter(Background=='22F') 
 
-mod2 <- lm(adj_max_od ~ 0 + Serotype*Background ,   data=comp2a)
+
+mod2 <- lm(adj_max_od ~ 0 + Serotype ,   data=comp2a)
 
 summary(mod2)
 
@@ -353,36 +393,17 @@ mod2.coef <- coef(mod2)
 
 beta2.background22F = mod2.coef['Background22F']
 
-st.eff.back15bc <- cbind.data.frame('beta1' =mod2.coef[-grep('Background', names(mod2.coef))])%>%
-  mutate(st =rownames(.)) %>%
-  filter(!(st %in% c('Serotype22Fdeltacps', 'Serotype22Fwt')))
 
+st.eff.back22f.marg <-  cbind.data.frame('beta2' =mod2.coef[grep('Serotype', names(mod2.coef))]) %>%
+  mutate(st = gsub('Serotype','',rownames(.))) %>%
+  filter(st !='deltacps')
 
-
-st.eff.back22f.marg <-  cbind.data.frame('beta2' =mod2.coef[grep('Background', names(mod2.coef))]) %>%
-  mutate(st = gsub(':Background22F','',rownames(.)))
-
-comb.effect <- st.eff.back15bc %>%
-  left_join(st.eff.back22f.marg, by='st') %>%
-  mutate(beta_back15bc = beta1,
-         beta_back22f = beta1 + beta2) %>%
-      #   beta_back22f = if_else(st=='Serotype11A',beta2.background22F, beta1 + beta2)) %>%
-  arrange(beta_back15bc) %>%
+comb.effect <- st.eff.back22f.marg %>%
+  #left_join(st.eff.back22f.marg, by='st') %>%
+  mutate(beta_back22f = beta2) %>%
+  arrange(beta_back22f) %>%
   mutate(order=row_number(),
          st=gsub('Serotype','', st))
-
-ggplot(comb.effect, aes(x=order, y=beta_back15bc, label=st)) +
-  geom_point() +
-  theme_classic() +
-       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(hjust=0, vjust=0)
-
-
-ggplot(comb.effect, aes(x=beta_back22f, y=beta_back15bc, label=st)) +
-  geom_point() +
-  theme_classic() +
-       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(hjust=0, vjust=0)
 
 
 ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/PS%20Composition_SS_final.csv') %>%
@@ -406,57 +427,18 @@ comb.effect2 <- comb.effect %>%
 
   )
 
-ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha2)) +
-  geom_point() +
-  theme_classic() +
-       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(hjust=0, vjust=0) +
- ylim(0,1.8)+
-  xlim(0,1.8)+
-  geom_vline(xintercept=0) +
-  geom_hline(yintercept=0) +
-  geom_abline(intercept=0, slope=1) +
-  xlab('Relative Max OD 22F Background') +
-  ylab('Relative Max OD 15B/C Background') +
-    scale_color_manual(values=c("#8da0cb", "#fc8d62")) +
-   guides(color=guide_legend(title="Rha"))
-
-
-
-mod1 <- lm(beta_back15bc ~ beta_back22f + any_gal + Rha, data=comb.effect2)
+mod1 <- lm(beta_back22f ~   Rha, data=comb.effect2)
 summary(mod1)
 
-mod1 <- lm(beta_back22f ~ beta_back15bc +  Rha, data=comb.effect2)
+mod1 <- lm(beta_back22f ~  NAC, data=comb.effect2)
 summary(mod1)
 
-mod1 <- lm(beta_back15bc ~ beta_back22f + NAC, data=comb.effect2)
-summary(mod1)
-
-mod1 <- lm(beta_back15bc ~ beta_back22f + uronic, data=comb.effect2)
+mod1 <- lm(beta_back22f ~  uronic, data=comb.effect2)
 summary(mod1)
 
 
 
 
-```
-
-```{r, fig.width=8, fig.height=8}
-ggplot(comb.effect2, aes(x=beta_back22f, y=beta_back15bc, label=st, color=Rha2)) +
-  geom_point(size=3) +
-  theme_classic() +
-       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  geom_text(size=6,hjust=0, vjust=0) +
- ylim(0,1.8)+
-  xlim(0,1.8)+
-  geom_vline(xintercept=0) +
-  geom_hline(yintercept=0) +
-  geom_abline(intercept=0, slope=1) +
-  xlab('Relative Max OD 22F Background') +
-  ylab('Relative Max OD 15B/C Background') +
-    scale_color_manual(values=c("#8da0cb", "#fc8d62")) +
-   guides(color=guide_legend(title="Rha"))+
-  theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"))
 ```
 
 
@@ -588,23 +570,12 @@ ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st, color=as.factor(vt))) 
   facet_wrap(~pop+period, scales='free') +
   theme_classic()
 
-ggplot(carr2, aes(x=beta_back15bc, y=carr_prop , label=st, color=as.factor(vt))) +
-  geom_point() +
-   geom_text() +
-  facet_wrap(~pop+period, scales='free') +
-  theme_classic()
 
 ##case carrier
 ggplot(carr2, aes(x=beta_back22f, y=case_carr , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
   facet_wrap(~study, scales='free') +
-  theme_classic()
-
-ggplot(carr2, aes(x=beta_back15bc, y=case_carr , label=st, color=as.factor(vt))) +
-  geom_point() +
-   geom_text() +
-    facet_wrap(~study, scales='free') +
   theme_classic()
 
 
@@ -616,12 +587,6 @@ carr_change2 <- carr_change  %>%
                  if_else(period=='post.pcv13.vs.7' & st %in% c('1','5','7F'),1,
                  if_else(period=='post.PCV13' & st %in% c('4','6B','9V','14','18C','19F','23F','1','3','5','6A','7F','19A'),1,0)))
           )
-
-ggplot(carr_change2, aes(x=beta_back15bc, y=change_carr , label=st, color=as.factor(vt))) +
-  geom_point() +
-   geom_text() +
-  facet_wrap(~pop+period, scales='free') +
-  theme_classic()
 
 ggplot(carr_change2, aes(x=beta_back22f, y=change_carr , label=st, color=as.factor(vt))) +
   geom_point() +
@@ -637,34 +602,26 @@ ggplot(carr_change2, aes(x=beta_back22f, y=change_carr , label=st, color=as.fact
 
 ```{r}
 ##Carriage
-mod1a <- glm.nb(carriage ~ beta_back15bc +study + vt , data=carr2)
-summary(mod1a)
-
-mod1b <- glm.nb(carriage ~ beta_back22f +study +vt, data=carr2)
+mod1b <- glm.nb(carriage ~ beta_back22f +study , data=carr2)
 summary(mod1b)
 
 #IPD
-mod2 <- glm.nb(disease ~ beta_back15bc +study + vt , data=carr2)
-summary(mod2)
-
 mod2 <- glm(disease ~ beta_back22f +study + vt , data=carr2, family='quasipoisson')
 summary(mod2)
 
 
 #case:carrier ratio
-mod3 <- lm(case_carr ~ beta_back15bc +study + vt , data=carr2)
-summary(mod3)
-
 carr2$log_case_carr=log(carr2$case_carr)
 mod3 <- lm(log_case_carr ~ beta_back22f +study + vt , data=carr2)
 summary(mod3)
 
+ggplot(carr2, aes(x=beta_back22f, y=log_case_carr, color=study)) +
+  geom_point()+
+  theme_classic() +
+  facet_wrap(~study)
+
 ```
 
-
-```{r}
-
-```
 
 
 
