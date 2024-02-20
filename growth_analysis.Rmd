@@ -33,9 +33,14 @@ a1c <- read_xlsx('./Data/Growth Curve Summary 020924 DAN.xlsx', sheet="22F cps s
   
   
   a1 <- bind_rows(a1a, a1b,a1c) %>%
-  mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background))
+          mutate(Background = if_else(Serotype %in% c('22Fdeltacps','22Fwt'), '22F', Background),
+              Serotype=gsub('\u2206cps', 'deltacps', Serotype))
 
-e1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V2a.xlsx', sheet='ELISA analysis')
+
+
+
+
+#e1 <- read_xlsx('./Data/Growth_Curve_Summary_Data_V2a.xlsx', sheet='ELISA analysis')
 ```
 
 ```{r}
@@ -45,17 +50,24 @@ names(a1)
 reshape to long format
 ```{r}
 a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep')) %>%
-  arrange(ID,Background, Serotype, Clone_N,Rep, value) %>%
+  arrange(ID,Background, Serotype, Clone_N,Rep, variable) %>%
   group_by(ID,Background, Serotype, Clone_N,Rep) %>%
   mutate( index= row_number() -1,  
           t= index/2,
           t0=min(value, na.rm=T),
-          OD= value - t0,
+          #OD= value - t0,
+          OD=if_else(value>=0, value, 0),
           ID2 = paste(ID, Rep, sep='_'),
           Serotype= if_else(Serotype=='8C','18C',Serotype ),
           Background= if_else(Background=='15B/C','15BC',Background ),
                     Serotype= if_else(Serotype=='15B/C','15BC',Serotype ),
           Serotype= if_else(Serotype=='9A','19A',Serotype ))  %>%
+     mutate( Strain_cat = if_else( grepl("22F_1\\(", ID), 'Donor'  ,
+                                if_else( grepl("15BC_15BC_1\\(", ID), '15BC'  ,
+                               if_else( grepl("15BC_1\\(", ID), 'Donor'  ,
+                                if_else(Background=='15BC', '15BC',
+                                  if_else(Background=='22F', '22F', 
+                                    if_else(Serotype==Background , 'Donor','Other'))))))) %>%
   filter(t<=24 & Background %in% c('15BC','22F', 'Donor')) %>%
   ungroup()
 ```
@@ -64,24 +76,32 @@ a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep
 Group by Background, color by Serotype
 
 ```{r}
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Serotype)) +
+
+p1 <- a1.m %>%
+   filter(Background %in% c('15BC','22F')) %>%
+ ggplot( aes(x=t, y=OD, group=ID2, color=Serotype)) +
   geom_line()+
   theme_classic() +
   facet_wrap(~Background)
 
 p1
+
 ggplotly(p1)
 ```
 Group by Serotype, color by Background
 
 ```{r}
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Background)) +
+
+p1 <- a1.m %>%
+   filter(Background %in% c('15BC','22F')) %>%
+ ggplot( aes(x=t, y=OD, group=ID2, color=Background)) +
   geom_line()+
   theme_classic() +
   facet_wrap(~Serotype)
 
 p1
 ```
+
 subset
 ```{r, fig.width=14, fig.height=8}
 
@@ -109,7 +129,9 @@ max.od
 ```
 
 ```{r}
-ggplot(max.od , aes(x=Serotype, y=max_od,color=Background, shape=Clone_N))+
+max.od %>%
+     filter(Background %in% c('15BC','22F')) %>%
+ggplot( aes(x=Serotype, y=max_od,color=Background, shape=Clone_N))+
   geom_point(alpha=0.5)+
   theme_classic()+
        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
@@ -132,15 +154,15 @@ smooth.func<-function(x, cont.correct){
 
 
 a2 <- a1.m %>%
-    group_by(ID,Background, Serotype, Clone_N,Rep) %>%
+    group_by(ID,Background, Serotype, Clone_N,Rep,Strain_cat) %>%
   filter(!is.na(OD)) %>%
     mutate(smoothvals = smooth.func(OD) ) %>%
 tidyr::unpack(., cols=smoothvals)
 
 
-p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Background)) +
+p1 <- ggplot(a1.m, aes(x=t, y=OD, group=ID2, color=Strain_cat)) +
   geom_line()+
-  geom_line(data=a2,aes(x=t, y=ODsm, group=ID2, color='gray'))+
+  geom_line(data=a2,aes(x=t, y=ODsm, group=ID2),color='gray')+
   theme_classic() +
   facet_wrap(~Serotype)
 
@@ -149,7 +171,7 @@ p1
 
 Plot of smoothed values
 ```{r}
-p1 <- ggplot(a2, aes(x=t, y=(ODsm), group=ID2, color=Serotype)) +
+p1 <- ggplot(a2, aes(x=t, y=(ODsm), group=ID2, color=Strain_cat)) +
   geom_line()+
   theme_classic() +
   facet_wrap(~Background)+
@@ -209,6 +231,7 @@ comp1 <- max.deriv.time %>%
   mutate( Serotype = if_else(Serotype=='∆cps', 'deltacps', Serotype),
        Serotype=as.factor(Serotype), 
           Serotype= relevel(Serotype, 'deltacps'))
+
 
 
 ggplot(comp1, aes(x=max_od, y=t_max_deriv))+
@@ -359,8 +382,8 @@ Allow effect of serotype to vary by background
 ```{r, fig.width=4, fig.height=3.5}
 
 comp2a <- comp2 %>%
-  filter(Background=='22F') #%>%
-    #filter(Serotype %in% c('11A','14', '15BC','16F','18C','19A','23A','24F','3','6C','7C','7F','8','9V')) #serotypes with both backgrounds
+  filter(Background=='22F') 
+
 
 mod2 <- lm(adj_max_od ~ 0 + Serotype ,   data=comp2a)
 
@@ -368,9 +391,8 @@ summary(mod2)
 
 mod2.coef <- coef(mod2)
 
-# st.eff.back15bc <- cbind.data.frame('beta1' =mod2.coef[-grep('Background', names(mod2.coef))])%>%
-#   mutate(st =rownames(.) ) %>%
-#   filter(!(st %in% c('Serotype22Fdeltacps', 'Serotype22Fwt')))
+beta2.background22F = mod2.coef['Background22F']
+
 
 st.eff.back22f.marg <-  cbind.data.frame('beta2' =mod2.coef[grep('Serotype', names(mod2.coef))]) %>%
   mutate(st = gsub('Serotype','',rownames(.))) %>%
@@ -416,6 +438,52 @@ summary(mod1)
 
 
 
+
+```
+
+
+## Max OD-- empirical mean vs rhamnose
+
+```{r}
+max.od.st <- max.od %>%
+  ungroup() %>%
+  filter(Background %in% c('22F','15BC')) %>%
+  rename(st=Serotype) %>%
+  mutate(Background=paste0('Back',Background)) %>%
+  group_by(Background, st) %>%
+  summarize(ave_max_od=mean(max_od, N=n()))  %>%
+  reshape2::dcast(st ~ Background, value.var='ave_max_od')%>%
+  left_join(ps1, by='st') %>%
+  mutate(any_gal = if_else(Gal == 1 | GalA==1,1,0),
+         NAC = if_else(GlcNAc==1 | GalNAc==1 | ManNAc==1 |  ManNAcA==1 |FucNAc==1 |PneNAc ==1,1,0 ),
+         uronic= if_else(GalA==1 | GlcA==1,1,0),
+         Gal = ifelse(st=='23A', 1, Gal) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Rha = ifelse(st=='23A', 1, Rha) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+         Gro = ifelse(st=='23A', 1, Gro) ,  #https://pubmed.ncbi.nlm.nih.gov/28837839
+               
+         Rha = as.factor(ifelse(st=='7C', 1, Rha)) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         NAC = ifelse(st=='7C', 1, NAC) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
+         Rha2 = if_else(Rha=='1', 'Yes', 
+                        if_else(Rha=='0','No', 'Unk'))
+
+  ) %>%
+  filter(!is.na(Back22F) & !is.na(Back15BC))
+
+
+ggplot(max.od.st, aes(x=Back22F, y=Back15BC, label=st, color=Rha2)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  geom_text(hjust=0, vjust=0) +
+ ylim(0,0.4)+
+  xlim(0,0.4)+
+  geom_vline(xintercept=0) +
+  geom_hline(yintercept=0) +
+  geom_abline(intercept=0, slope=1) +
+  xlab('Relative Max OD 22F Background') +
+  ylab('Relative Max OD 15B/C Background') +
+    scale_color_manual(values=c("#8da0cb", "#fc8d62", 'lightgray')) +
+   guides(color=guide_legend(title="Rha"))
 
 ```
 
