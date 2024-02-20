@@ -40,9 +40,8 @@ key1 <-  readxl::read_excel('./Data/PathogenWatch/Pathogen Watch Output (Capsule
          parent_ST=  gsub("∆cps", "", parent_ST),
          new_ST= sub(".*::(\\S+) .*", "\\1", straininfo),
          Clone=extracted_text <- sub("^[^ ]+ (.*)", "\\1", straininfo,
-)
-)%>%
-  dplyr::select(strain,parent_ST,new_ST,Clone)
+    )
+   )%>%  dplyr::select(strain,parent_ST,new_ST,Clone)
 
 g0 <- read.table(file = './Data/Pangenome.gene.presence.absence.tsv', sep = '\t', header = TRUE) %>%
   mutate(Cps.gene.name = if_else(is.na(Cps.gene.name), Gene.cluster, Cps.gene.name), 
@@ -98,7 +97,7 @@ row.names(g3) <- g3$variable
 g3 <- g3 %>%   select(-variable)
 
 prev_acq_g3 <- apply(g3, 2,mean)
-cutoff <- 2/nrow(g2)
+cutoff <- 3/nrow(g2) #must be different in at least 2 strains
 g3 <- g3[,prev_acq_g3>=cutoff & prev_acq_g3<= (1-cutoff)]
 
 a1 <- read.table(file = './Data/Genes.with.annotations.tsv', sep = '\t', header = TRUE) %>%
