@@ -757,65 +757,53 @@ ggplot(predict.holdout, aes(x=pred1, y=carriage, label=st, col=vt)) +
 ```
 
 
-lasso
+
+
 ```{r}
-library(mpath)
+f1 <- a1.m %>%
+    group_by(ID2,Background, Serotype, Clone_N,Rep) %>%
+    summarize( max_od=max(OD, na.rm=T)) %>%
+  mutate(Clone_N=as.factor(Clone_N))  %>%
+  ungroup() %>%
+  group_by(Serotype, Background) %>%
+  summarize(max.od=mean(max_od, na.rm=T)) %>%
+  ungroup() %>%
+  reshape2::dcast(Serotype ~Background) %>%
+  rename(maxod_15bc="15BC", maxod_22f='22F', maxod_donor='Donor') %>%
+  mutate(back_vs_15bc=maxod_15bc/maxod_donor,
+         back_vs_22F= maxod_22f/maxod_donor)
 
-#PCV
-mod1.reg <- cv.glmregNB(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha , alpha=0.99, data=carr_ps2,parallel=T)
-optim.lambda <- mod1.reg$lambda.optim
 
-plot(mod1.reg)
-abline(v=log(optim.lambda))
-summary(mod1.reg)
+ggplot(f1, aes(x=maxod_donor, y= maxod_22f, label=Serotype)) +
+  geom_text() +
+  theme_classic() +
+  xlim(0.1,0.4)+
+    ylim(0.1,0.4)+
+  geom_abline(intercept=0, slope=1, lty=2, color='gray')
 
+ggplot(f1, aes(x=maxod_donor, y= maxod_22f, label=Serotype)) +
+  geom_text() +
+  theme_classic()+
+  xlim(0.1,0.4)+
+    ylim(0.1,0.4)+
+  geom_abline(intercept=0, slope=1, lty=2, color='gray')
 
+ggplot(f1, aes(x=maxod_22f, y= maxod_15bc, label=Serotype)) +
+  geom_text() +
+  theme_classic() +
+  xlim(0.1,0.4)+
+    ylim(0.1,0.4)+
+  geom_abline(intercept=0, slope=1, lty=2, color='gray')
 
-mod2.reg <- glmregNB(carriage ~ study + vt + GlcA + GalA+ GlcNAc + GalNAc+Rha , lambda=exp(-3), alpha=0.99, data=carr_ps2,parallel=T)
+ggplot(f1, aes(x=back_vs_15bc, y= back_vs_22F, label=Serotype)) +
+  geom_text() +
+  theme_classic() +
+  xlim(0.3,2.5)+
+    ylim(0.3,2.5)+
+  geom_abline(intercept=0, slope=1, lty=2, color='gray')+
+  geom_vline(xintercept=1,lty=2, color='gray')+
+    geom_hline(yintercept=1,lty=2, color='gray')
 
-mod2.reg$beta
 ```
-
-## Look at multiple transformants
-
-
-reshape to long format
-```{r}
-e1.m <- reshape2::melt(e1, id.vars=c('ID','Serotype','Background','Clone_N','Rep')) %>%
-  arrange(ID,Background, Serotype, Clone_N,Rep, value) %>%
-  group_by(ID,Background, Serotype, Clone_N,Rep) %>%
-  mutate( index= row_number() -1,  
-          t= index/2,
-          t0=min(value, na.rm=T),
-          OD= value - t0,
-          ID2 = paste(ID, Rep, sep='_'),
-          Serotype= if_else(Serotype=='8C','18C',Serotype ),
-          Serotype= if_else(Serotype=='15B/C','15BC',Serotype ),
-          Serotype= if_else(Serotype=='9A','19A',Serotype ),
-          Clone_N=as.factor(Clone_N))  %>%
-  filter(t<=24 & Background %in% c('15BC','22F')) %>%
-  ungroup() 
-  
-```
-
-
-Group by Background, color by Serotype
-
-```{r, fig.width=5, fig.height=4}
-e1.m %>%
-  filter(Serotype=='8') %>%
- ggplot( aes(x=t, y=OD, group=interaction(Clone_N, Rep), color=Clone_N)) +
-  geom_line()+
-  theme_classic() + 
-  scale_color_manual(values=c("#1b9e77", "#d95f02")) +
-  theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14,face="bold"))+
-  theme(legend.position="none")
-#+
- # facet_wrap(~ID, nrow = 1)
-
-#ggplotly(p1)
-```
-
 
 
