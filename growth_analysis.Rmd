@@ -54,9 +54,10 @@ a1.m <- reshape2::melt(a1, id.vars=c('ID','Serotype','Background','Clone_N','Rep
   group_by(ID,Background, Serotype, Clone_N,Rep) %>%
   mutate( index= row_number() -1,  
           t= index/2,
-          t0=min(value, na.rm=T),
-          #OD= value - t0,
-          OD=if_else(value>=0, value, 0),
+          OD_t0 = if_else(t==min(t), value,0), 
+          OD_t0 = max(OD_t0), 
+          OD = value - OD_t0, #Zero out the growth curves!
+          OD=if_else(OD>=0, OD, 0),
           ID2 = paste(ID, Rep, sep='_'),
           Serotype= if_else(Serotype=='8C','18C',Serotype ),
           Background= if_else(Background=='15B/C','15BC',Background ),
@@ -254,17 +255,78 @@ ggplot(comp1, aes(x=Serotype, y=max_od, color=Background))+
   ggtitle('Max density by serotype')+
        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
+g <- ggplot(comp1, aes(Serotype, max_od))
+g + geom_boxplot(aes(fill=factor(Background, levels=c('Donor','15BC','22F'))),position = position_dodge(width = 0.9)) +
+  theme_classic()+theme(legend.title=element_blank())+
+   stat_summary(
+    fun.y = median,
+    geom = 'line',
+    aes(group = Serotype),
+    position = position_dodge(width = 0.9) #this has to be added
+  )
+
+
 ```
+
+```{r, fig.width=8}
+comp1 %>%
+  group_by(Background, Serotype) %>%
+  summarize(max_od_mean =mean(max_od), max_od_sd = sd(max_od)) %>%
+  ungroup() %>%
+  ggplot(., aes(x=Serotype, y=max_od_mean, color=Background))+
+  geom_point() +
+  geom_line( aes(x=Serotype, y=max_od_mean, color=Background, group=Serotype))
+  theme_classic()+
+  ggtitle('Max density by serotype')+
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  
+  
+plot.df <- comp1 %>%
+  group_by(Background, Serotype) %>%
+  summarize(max_od_mean =mean(max_od), max_od_sd = sd(max_od)) %>%
+  ungroup() %>%  
+  mutate(Background= factor(Background, levels=c('Donor','22F','15BC'))                             )
+
+  ggplot(plot.df, aes(x = Background, y = max_od_mean, group = Serotype, color = Serotype))   +
+    geom_line()+
+  labs(x = "Background", y = "Max OD", color = "Serotype") +
+  theme_minimal()
+
+  
+```
+
 
 
 ```{r}
 st.avg.max.od <- comp1 %>%
   group_by(Serotype,Background) %>%
-  summarize(max_od = mean(max_od, na.rm=T)) %>%
+  summarize(max_od_mean = mean(max_od, na.rm=T), max_od_sd=sd(max_od, na.rm=T)) %>%
   rename(st=Serotype) %>%
+  mutate(max_od_lcl= max_od_mean - 1.96*max_od_sd,
+         max_od_ucl= max_od_mean + 1.96*max_od_sd) %>%
   ungroup() %>%
-  reshape2::dcast(.,st~Background, value.var='max_od') %>%
+  reshape2::dcast(.,st~Background, value.var='max_od_mean') %>%
   rename(Back15BC=`15BC`, Back22F=`22F`)
+
+st.avg.max.od.lcl <- comp1 %>%
+  group_by(Serotype,Background) %>%
+summarize(max_od_mean = mean(max_od, na.rm=T), max_od_sd=sd(max_od, na.rm=T)) %>%
+  rename(st=Serotype) %>%
+  mutate(max_od_lcl= max_od_mean - 1.96*max_od_sd,
+         max_od_ucl= max_od_mean + 1.96*max_od_sd) %>%
+  ungroup() %>%
+  reshape2::dcast(.,st~Background, value.var='max_od_lcl') %>%
+  rename(Back15BC_lcl=`15BC`, Back22F_lcl=`22F`, Donor_lcl=Donor)
+
+st.avg.max.od.ucl <- comp1 %>%
+  group_by(Serotype,Background) %>%
+ summarize(max_od_mean = mean(max_od, na.rm=T), max_od_sd=sd(max_od, na.rm=T)) %>%
+  rename(st=Serotype) %>%
+  mutate(max_od_lcl= max_od_mean - 1.96*max_od_sd,
+         max_od_ucl= max_od_mean + 1.96*max_od_sd) %>%
+  ungroup() %>%
+  reshape2::dcast(.,st~Background, value.var='max_od_ucl') %>%
+  rename(Back15BC_ucl=`15BC`, Back22F_ucl=`22F`, Donor_ucl=Donor)
 
 ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/master/Data/PS%20Composition_SS_final.csv') %>%
   rename(st=Serotype) %>%
@@ -272,6 +334,8 @@ ps1 <-read.csv('https://raw.githubusercontent.com/weinbergerlab/GrowthVariation/
           ) 
 
 comp_od <- st.avg.max.od %>%
+  left_join(st.avg.max.od.ucl, by='st') %>%
+  left_join(st.avg.max.od.lcl, by='st') %>%
   left_join(ps1, by='st') %>%
   mutate(any_gal = if_else(Gal == 1 | GalA==1,1,0),
          NAC = if_else(GlcNAc==1 | GalNAc==1 | ManNAc==1 |  ManNAcA==1 |FucNAc==1 |PneNAc ==1,1,0 ),
@@ -302,6 +366,99 @@ ggplot(comp_od, aes(x=Back22F, y=Back15BC, label=st, color=Rha2)) +
     scale_color_manual(values=c("#8da0cb", "#fc8d62")) +
    guides(color=guide_legend(title="Rha"))
 ```
+
+Plot for paper
+```{r, fig.width=6, fig.height=6}
+
+wt_od_15bc <- comp_od$Back15BC[comp_od$st=='WT']
+wt_od_22f <- comp_od$Back22F[comp_od$st=='WT']
+
+ggplot(comp_od, aes(x=Back22F, y=Back15BC, label=st)) +
+  #geom_linerange(aes(ymin=Back15BC_lcl, ymax=Back15BC_ucl), color='lightgray')+
+  #geom_linerange(aes(xmin=Back22F_lcl, xmax=Back22F_ucl), color='lightgray')+
+    geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  #geom_text(hjust=0, vjust=0) +
+
+ coord_cartesian(xlim=c(0,0.5), ylim=c(0,0.5))+
+   geom_text_repel() +
+  geom_vline(xintercept=wt_od_22f, color='gray', lty=3)+
+  geom_hline(yintercept=wt_od_15bc, color='gray', lty=3)+
+geom_abline(intercept=0, slope=1, color='gray', lty=2) +
+  xlab('Max OD 22F Background') +
+  ylab('Max OD 15B/C Background') 
+
+
+comp_od %>%
+  filter( st!='WT' & st !='deltacps' & !is.na(Back15BC) & !is.na(Back22F))%>%
+  summarize(sd_15 = sd(Back15BC, na.rm=T),
+            sd_22f = sd(Back22F, na.rm=T),
+            
+            min_15bc=min(Back15BC),
+            max_15bc=max(Back15BC),
+            min_22f=min(Back22F),
+            max_22f=max(Back22F),
+            )
+
+```
+
+```{r, fig.width=6, fig.height=6}
+p1 <- comp_od %>%
+  mutate(var15BC =((Back15BC_ucl - Back15BC)/1.96)^2 ,
+         var22F =((Back22F_ucl - Back22F)/1.96)^2,
+         var_comb= var15BC +var22F,
+         inv_var_comb=1/var_comb) %>%
+  ggplot(., aes(x=Back22F, y=Back15BC, label=st)) +
+  geom_point(aes(x=Back22F, y=Back15BC, size=inv_var_comb),alpha=0.5) +
+       geom_point(alpha=0) +
+    theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+ coord_cartesian(xlim=c(0,0.5), ylim=c(0,0.5))+
+   geom_text_repel() +
+  geom_vline(xintercept=wt_od_22f, color='gray', lty=3)+
+  geom_hline(yintercept=wt_od_15bc, color='gray', lty=3)+
+geom_abline(intercept=0, slope=1, color='gray', lty=2) +
+  xlab('Max OD 22F Background') +
+  ylab('Max OD 15B/C Background') + 
+  theme(legend.position = "none")+
+  scale_size(range = c(.1, 10))
+p1
+```
+
+```{r, fig.width=6, fig.height=6}
+plotA <- ggplot(comp_od, aes(x=Donor, y=Back15BC, label=st)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  #geom_text(hjust=0, vjust=0) +
+ ylim(0.1,0.45)+
+  xlim(0.1,0.45)+
+   geom_text_repel() +
+geom_abline(intercept=0, slope=1, color='gray', lty=2) +
+  xlab('Max OD Donor') +
+  ylab('Max OD 15B/C Background') 
+
+plotB <- ggplot(comp_od, aes(x=Donor, y=Back22F, label=st)) +
+  geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  #geom_text(hjust=0, vjust=0) +
+ ylim(0.1,0.45)+
+  xlim(0.1,0.45)+
+   geom_text_repel() +
+geom_abline(intercept=0, slope=1, color='gray', lty=2) +
+  xlab('Max OD Donor') +
+  ylab('Max OD 22F Background') 
+
+A
+B
+
+plotA + plotB
+
+```
+
+
 
 look at difference between genetic background (how doe affect of serotype vary by background)
 
@@ -563,11 +720,16 @@ carr2 <- carr1 %>%
   )
 
 
+carr2.summary <- carr2 %>%
+  group_by(period, st,vt) %>%
+  summarize(beta_back22f=mean(beta_back22f),
+           carr_prop=mean(carr_prop) )
+
 ## Carriage
-ggplot(carr2, aes(x=beta_back22f, y=carr_prop , label=st, color=as.factor(vt))) +
+ggplot(carr2.summary, aes(x=beta_back22f, y=carr_prop , label=st, color=as.factor(vt))) +
   geom_point() +
    geom_text() +
-  facet_wrap(~pop+period, scales='free') +
+  facet_wrap(~period, scales='free') +
   theme_classic()
 
 
@@ -602,23 +764,35 @@ ggplot(carr_change2, aes(x=beta_back22f, y=change_carr , label=st, color=as.fact
 
 ```{r}
 ##Carriage
-mod1b <- glm.nb(carriage ~ beta_back22f +study , data=carr2)
+mod1b <- carr2.summary %>%
+  filter(period=='pre.PCV') %>%
+ lm(carr_prop    ~ beta_back22f , data=.)
 summary(mod1b)
 
 #IPD
-mod2 <- glm(disease ~ beta_back22f +study + vt , data=carr2, family='quasipoisson')
-summary(mod2)
+# mod2 <- glm(disease ~ beta_back22f +study + vt , data=carr2, family='quasipoisson')
+# summary(mod2)
 
 
 #case:carrier ratio
-carr2$log_case_carr=log(carr2$case_carr)
-mod3 <- lm(log_case_carr ~ beta_back22f +study + vt , data=carr2)
-summary(mod3)
+inv1.st <- readxl::read_excel('./Data/lochen invasiveness_u5.xlsx') %>%
+  mutate(log.inv.age1= log10(invasiveness),
+         log_inv_lcl =log10(invasiveness_lower),
+         log_inv_ucl =log10(invasiveness_upper),
+         log.inv.prec.age1 = (1/(log_inv_ucl -log.inv.age1 )/1.96 )^2,
+         log.inv.prec.age1b = (1/(log.inv.age1- log_inv_lcl  )/1.96 )^2,
+         Serotype= if_else(Serotype=='15B/C','15BC',Serotype)
+  ) %>%
+  rename(st=Serotype) %>%
+    full_join(comb.effect2, by='st') 
 
-ggplot(carr2, aes(x=beta_back22f, y=log_case_carr, color=study)) +
+mod3 <- lm(log.inv.age1 ~ beta_back22f  , data=inv1.st)
+ summary(mod3)
+ 
+
+ggplot(inv1.st, aes(x=beta_back22f, y=log.inv.age1)) +
   geom_point()+
-  theme_classic() +
-  facet_wrap(~study)
+  theme_classic() 
 
 ```
 
@@ -806,4 +980,27 @@ ggplot(f1, aes(x=back_vs_15bc, y= back_vs_22F, label=Serotype)) +
 
 ```
 
+
+## Alternative approach for maxOD
+```{r, fig.width=6, fig.height=6}
+ave_curves <- a2 %>%
+  group_by(Serotype, Background,t) %>%
+  summarize(OD=mean(OD, na.rm=T)) %>%
+  ungroup() %>%
+  group_by(Serotype, Background) %>%
+  summarize(max_OD=max(OD, na.rm=T)) %>%
+  reshape2::dcast(Serotype~Background, value.var='max_OD') %>%
+  rename(maxOD_15BC=`15BC`, maxOD_22F=`22F`)
+
+wt_od_15bc <- ave_curves$maxOD_15BC[ave_curves$Serotype=='WT']
+wt_od_22f <- ave_curves$maxOD_22F[ave_curves$Serotype=='WT']
+
+ggplot(ave_curves, aes(x=maxOD_22F, y=maxOD_15BC)) +
+   coord_cartesian(xlim=c(0,0.5), ylim=c(0,0.5))+
+  geom_point()+
+  theme_classic()+
+   geom_vline(xintercept=wt_od_22f, color='gray', lty=3)+
+  geom_hline(yintercept=wt_od_15bc, color='gray', lty=3)+
+geom_abline(intercept=0, slope=1, color='gray', lty=2) 
+```
 
