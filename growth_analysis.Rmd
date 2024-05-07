@@ -1002,5 +1002,16 @@ ggplot(ave_curves, aes(x=maxOD_22F, y=maxOD_15BC)) +
    geom_vline(xintercept=wt_od_22f, color='gray', lty=3)+
   geom_hline(yintercept=wt_od_15bc, color='gray', lty=3)+
 geom_abline(intercept=0, slope=1, color='gray', lty=2) 
+
+ave_curves %>%
+  filter( Serotype!='WT' & Serotype !='deltacps' & !is.na(maxOD_15BC) & !is.na(maxOD_22F))%>%
+  summarize(sd_15 = sd(maxOD_15BC, na.rm=T),
+            sd_22f = sd(maxOD_22F, na.rm=T),
+            
+            min_15bc=min(maxOD_15BC),
+            max_15bc=max(maxOD_15BC),
+            min_22f=min(maxOD_22F),
+            max_22f=max(maxOD_22F),
+            )
 ```
 
