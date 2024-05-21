@@ -127,6 +127,15 @@ max.od <- a1.m %>%
   mutate(Clone_N=as.factor(Clone_N)) 
 
 max.od
+
+max.od.ave <- max.od %>%
+  ungroup() %>%
+  group_by(Background, Serotype, Clone_N) %>%
+  summarize(max_od_mean=mean(max_od),
+            max_od_sd=sd(max_od),
+            N=n())
+write.csv(max.od.ave, './Data/max_od_ave.csv')
+  
 ```
 
 ```{r}
@@ -400,6 +409,10 @@ comp_od %>%
             min_22f=min(Back22F),
             max_22f=max(Back22F),
             )
+
+```
+```{r}
+saveRDS(st.avg.max.od,'../rosch_cps/Data/ay_switches.rds')
 
 ```
 
