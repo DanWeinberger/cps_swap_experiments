@@ -411,6 +411,52 @@ comp_od %>%
             )
 
 ```
+for grant application 
+```{r, fig.width=3, fig.height=3}
+
+ranges <-comp_od %>%
+  filter( st!='WT' & st !='deltacps' & !is.na(Back15BC) & !is.na(Back22F))%>%
+  summarize(sd_15 = sd(Back15BC, na.rm=T),
+            sd_22f = sd(Back22F, na.rm=T),
+            
+            min_15bc=min(Back15BC),
+            max_15bc=max(Back15BC),
+            min_22f=min(Back22F),
+            max_22f=max(Back22F),
+            
+            lq_15bc = quantile(Back15BC, prob=0.2),
+            uq_15bc = quantile(Back15BC, prob=0.8),
+            lq_22f = quantile(Back22F, prob=0.2),
+            uq_22f = quantile(Back22F, prob=0.8),
+
+            )
+
+wt_od_15bc <- comp_od$Back15BC[comp_od$st=='WT']
+wt_od_22f <- comp_od$Back22F[comp_od$st=='WT']
+
+comp_od %>%
+  filter(st !='deltacps') %>%
+ggplot(., aes(x=Back22F, y=Back15BC, label=st)) +
+  #geom_linerange(aes(ymin=Back15BC_lcl, ymax=Back15BC_ucl), color='lightgray')+
+  #geom_linerange(aes(xmin=Back22F_lcl, xmax=Back22F_ucl), color='lightgray')+
+    geom_point() +
+  theme_classic() +
+       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  #geom_text(hjust=0, vjust=0) +
+
+ coord_cartesian(xlim=c(0,0.4), ylim=c(0,0.4))+
+   geom_text_repel() +
+  geom_vline(xintercept=wt_od_22f, color='gray', lty=3)+
+  geom_hline(yintercept=wt_od_15bc, color='gray', lty=3)+
+#geom_abline(intercept=0, slope=1, color='gray', lty=2) +
+  xlab('Max OD 22F Background') +
+  ylab('Max OD 15B/C Background') +
+  geom_linerange(aes(x=0, ymin=ranges$min_15bc, ymax=ranges$max_15bc), color='gray')+
+  geom_linerange(aes(y=0, xmin=ranges$min_22f, xmax=ranges$max_22f), color='gray')
+
+
+```
+
 ```{r}
 saveRDS(st.avg.max.od,'../rosch_cps/Data/ay_switches.rds')
 
