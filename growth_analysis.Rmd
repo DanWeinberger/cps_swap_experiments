@@ -19,6 +19,7 @@ library(readxl)
 library(patchwork)
 library(reshape2)
 library(plotly)
+library(ggrepel)
 library(MASS)
 ```
 
@@ -214,7 +215,7 @@ ggplotly(p3)
 ```
 
 ```{r}
-p1/p2
+#p1/p2
 ```
 
 At what time point does max growth occur?
@@ -278,16 +279,16 @@ g + geom_boxplot(aes(fill=factor(Background, levels=c('Donor','15BC','22F'))),po
 ```
 
 ```{r, fig.width=8}
-comp1 %>%
-  group_by(Background, Serotype) %>%
-  summarize(max_od_mean =mean(max_od), max_od_sd = sd(max_od)) %>%
-  ungroup() %>%
-  ggplot(., aes(x=Serotype, y=max_od_mean, color=Background))+
-  geom_point() +
-  geom_line( aes(x=Serotype, y=max_od_mean, color=Background, group=Serotype))
-  theme_classic()+
-  ggtitle('Max density by serotype')+
-       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+# comp1 %>%
+#   group_by(Background, Serotype) %>%
+#   summarize(max_od_mean =mean(max_od), max_od_sd = sd(max_od)) %>%
+#   ungroup() %>%
+#   ggplot(., aes(x=Serotype, y=max_od_mean, color=Background))+
+#   geom_point() +
+#   geom_line( aes(x=Serotype, y=max_od_mean, color=Background, group=Serotype))
+#   theme_classic()+
+#   ggtitle('Max density by serotype')+
+#        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
   
   
 plot.df <- comp1 %>%
@@ -356,7 +357,9 @@ comp_od <- st.avg.max.od %>%
          Rha = as.factor(ifelse(st=='7C', 1, Rha)) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
          NAC = ifelse(st=='7C', 1, NAC) ,  #https://pubmed.ncbi.nlm.nih.gov/29715685/
          Rha2 = if_else(Rha=='1', 'Yes', 
-                        if_else(Rha=='0','No', 'Unk'))
+                        if_else(Rha=='0','No', 'Unk')),
+         uronic2 = if_else(uronic=='1', 'Yes', 
+                        if_else(uronic=='0','No', 'Unk'))
 
   )
 
