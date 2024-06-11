@@ -39,293 +39,37 @@ These plots represent pangenomes created based on the sequenced strains. The hea
 #a1b <- read.csv('./Data/PathogenWatch/strain(1).csv') %>% rename(gpsc=Lineage)
 
 
-key1 <-  readxl::read_excel('./Data/PathogenWatch/Pathogen Watch Output (Capsule Switch Mutants).xlsx') %>% 
-  dplyr::rename(straininfo=`Capsule Switch Isolate`,strain=`Genome Name`) %>%
-  mutate(parent_ST= sub("::.*", "", straininfo),
-         parent_ST=  gsub("∆cps", "", parent_ST),
-         new_ST= sub(".*::(\\S+) .*", "\\1", straininfo),
-         Clone=extracted_text <- sub("^[^ ]+ (.*)", "\\1", straininfo,
-    )
-   )%>%  dplyr::select(strain,parent_ST,new_ST,Clone)
+a1 <- read.table('./Data/pangenome/York.gene.presence.absence.15BC.tsv', header=T) %>%
+  dplyr::select(-sample.id, -serotype.pcr,-sample.name.full,-sample.type, -sequencing.run, -sample.sequenced.clones,-serotype.genome) %>%
+  reshape2::melt(.,id.vars=c('serotype.parental.strain','serotype.switched.strain','gpsc.lineage')) %>%
+  rename( gene.cluster.name=variable)
+
+a2 <- read.table('./Data/pangenome/York.gene.presence.absence.22F.tsv', header=T)%>%
+  dplyr::select(-sample.id, -serotype.pcr,-sample.name.full,-sample.type, -sequencing.run, -sample.sequenced.clones,-serotype.genome) %>%
+  reshape2::melt(.,id.vars=c('serotype.parental.strain','serotype.switched.strain','gpsc.lineage')) %>%
+  rename( gene.cluster.name=variable)
+
+b1 <- bind_rows( a1,a2)
+
+# a value of "0" means the gene is present/absent in both the ref WT and capsule-switched strain, "1" means present in the WT but not the capsule-switched strain (i.e., possibly deleted), and "2" means absence in the WT but present in the capsule-switched strain (i.e., possibly inserted).
+
+c1 <- read.table('./Data/pangenome/York.gene.presence.absence.annotation.tsv', header=T) %>%
+  left_join(b1, by='gene.cluster.name') %>%
+  filter(value==2) %>%
+  group_by(gene.cluster.annotation) %>%
+  mutate(N_insert=n()) %>%
+  filter(N_insert>1 & gene.cluster.annotation  !='hypothetical protein')
 
 
 
-gene_key <- read.csv('./Data/pangenome/gene_presence_absence.csv') %>%
-  dplyr::select(Gene, Non.unique.Gene.name,Annotation)
 
-g0 <- read.table(file='./Data/pangenome/gene_presence_absence.Rtab', header=T) %>%
-  left_join(gene_key, by='Gene')
-
-
-g0 <- read.table(file = './Data/Pangenome.gene.presence.absence.tsv', sep = '\t', header = TRUE) %>%
-  mutate(Cps.gene.name = if_else(is.na(Cps.gene.name), Gene.cluster, Cps.gene.name), 
-         gene_name_cluster= paste(Cps.gene.name,Gene.cluster, sep='_'),
-    gene_cluster_no_numb = ifelse(grepl('_', Gene.cluster), str_extract(Gene.cluster,  "^(.*?)(?=_)"), Gene.cluster
-    )
-    )%>%
-  group_by(gene_cluster_no_numb) %>%
-  arrange(Gene.cluster) %>%
-  mutate(index=row_number(), 
-         Gene.cluster2=paste(gene_cluster_no_numb, index, sep='_')) %>%
-  ungroup()
-
-
-g2.labs <- key1$strain[key1$parent_ST=='15B/C']
-
-g3.labs <- key1$strain[key1$parent_ST=='22F']
-
-
-# g1 <- g0 %>%
-#   dplyr::select( gene_name_cluster, all_of(intersect(g1.labs, names(g0)))) %>%
-#   reshape2::melt(., id.vars=c('gene_name_cluster')) %>%
-#   reshape2::dcast(variable ~ gene_name_cluster) 
-# 
-# row.names(g1) <- g1$variable
-# g1 <- g1 %>%   select(-variable)
-# 
-# prev_acq_g1 <- apply(g1, 2,mean)
-# g1 <- g1[,prev_acq_g1>0 & prev_acq_g1<1]
-
-##same for g2
-
-g2 <- g0 %>%
-  dplyr::select( Gene.cluster2, all_of(intersect(g2.labs, names(g0)))) %>%
-  reshape2::melt(., id.vars=c('Gene.cluster2')) %>%
-  reshape2::dcast(variable ~ Gene.cluster2) 
-
-row.names(g2) <- g2$variable
-g2 <- g2 %>%   select(-variable)
-
-prev_acq_g2 <- apply(g2, 2,mean)
-cutoff <- 2/nrow(g2)
-g2 <- g2[,prev_acq_g2>=cutoff & prev_acq_g2<= (1-cutoff)]
-
-##same for g3
-
-g3 <- g0 %>%
-  dplyr::select( Gene.cluster2, all_of(intersect(g3.labs, names(g0)))) %>%
-  reshape2::melt(., id.vars=c('Gene.cluster2')) %>%
-  reshape2::dcast(variable ~ Gene.cluster2) 
-
-row.names(g3) <- g3$variable
-g3 <- g3 %>%   select(-variable)
-
-prev_acq_g3 <- apply(g3, 2,mean)
-cutoff <- 3/nrow(g2) #must be different in at least 2 strains
-g3 <- g3[,prev_acq_g3>=cutoff & prev_acq_g3<= (1-cutoff)]
-
-a1 <- read.table(file = './Data/Genes.with.annotations.tsv', sep = '\t', header = TRUE) %>%
-  dplyr::rename(Gene=Gene.cluster) %>%
-  mutate(Gene= gsub('~~~~~~','......', fixed=T, Gene ),
-         Non.unique.Gene.name = gsub(';','',Non.unique.Gene.name,fixed=T),
-    Non.unique.Gene.name = if_else(Non.unique.Gene.name=='', Gene,Non.unique.Gene.name )) %>%
-  #filter(Non.unique.Gene.name!='') %>%
-  arrange(Non.unique.Gene.name) %>%
-  group_by(Non.unique.Gene.name) %>%
-  mutate(Gene.cluster2 = paste0(Non.unique.Gene.name,'_', row_number()),
-        Cps.Gene = if_else(Cps.gene.name!='',1,0),
-      gene_name_cluster= paste(Gene, Non.unique.Gene.name, sep='_')
-) %>%
-  ungroup() %>%
-  dplyr::select(Gene.cluster2,Cps.Gene,gene_name_cluster, Gene,Non.unique.Gene.name,Cps.gene.name ,Sequence)
-
-
-p2 <- plot.func.addition(g2)
-
-p3 <- plot.func.addition(g3)
 
 
 ```
 
-## Serotype 9V background
+nspC/aguA locus acquired with 8, 24F, 15BC on GPSC19;at least a couple of these seem to be in an operon (AguA, nspC):
 
-Parent strain is Serotype 9V ID ABC010001831, obtained from the CDC
+also notable that speA exchanged on a couple of the switches (this looks like maybe an allelic exchange>)
 
-```{r, fig.width=10, fig.height=5}
-#p1$p
-```
-
-## Serotype 15B/C background
-
-Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
-
-```{r, fig.width=10, fig.height=5}
-p2$p
-```
-
-## Serotype 22F background
-
-Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
-
-```{r, fig.width=10, fig.height=5}
-p3$p
-```
-
-```{r}
-#p1$gain_loss <- p1$gain_loss %>%
- # mutate(parentST='9V')
-
-p2$gain_loss <- p2$gain_loss %>%
-  mutate(parentST='15BC')
-
-p3$gain_loss <- p3$gain_loss %>%
-  mutate(parentST='22F')
-  
-
-#here we are looking for strains that have gain of one allele and loss of another..see 15B.C #3; gpsB_1
-combined <- bind_rows( p2$gain_loss, p3$gain_loss) %>%
-  filter(value %in% c(-1,1)) %>%
-  arrange(Var1, Var2)
-```
-
-```{r, eval=F}
-#prepare  for BLAST
-
-library (devtools)
-library (tidyverse)
-#install.packages("BiocManager")
-#BiocManager::install("Biostrings")
-library(Biostrings)
-source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_and_tabular.R")
-
- a1 %>% select(allele, Sequence) %>%
-  write.csv('./Data/genes.csv', row.names = F)
-#TabularToFasta("./Data/genes.csv")
- 
- source_url("https://raw.githubusercontent.com/lrjoshi/FastaTabular/master/fasta_and_tabular.R")
-
-
- prot1 <- a1 %>% select(allele, Sequence)
-
- prot2 <-  apply(prot1,1, function(x){
-      as.character(translate(DNAString(x['Sequence'])))
-      }, simplify=F) %>%
-   unlist()
-
- 
- prot3 <- cbind.data.frame('allele'=a1$allele, 'aa'=prot2 ) %>% 
-   mutate(allele=paste0('gene_',allele)) %>%   
-   write.csv('./Data/aa.csv', row.names = F)
-
-TabularToFasta("./Data/aa.csv")  #note this generates a FASTA file on the home directory called dna_fasta.fasta
-
-#IN tblastn, upload AA sequence, BLAST against TIGR4 specifically, then 'download all' as hit table csv. note use tblastn NOT blastn
-```
-
-## Genomic context of gain/loss based on mapping to TIGR4 genome
-
-Set 1: Parent Strain is 9V
-
-8, 7F, 7C, 6C, 22F, 19A
-```{r}
-loc1 <- read.csv('./Data/DBB51US6016-Alignment-HitTable.csv', header=F) %>%
-  filter(V2=='CP089948.1') %>%
-  dplyr::rename(allele1=V1, pct_ident=V3, start=V9, end=V10, positives_pct=V13, matchNaa=V4, query_length =V8) %>%
-  mutate(pct_coverage = (matchNaa)/query_length*100
-         ) %>%
-  filter(pct_ident>90 & pct_coverage >90) %>%
-  select(allele1, start, end,pct_ident,pct_coverage,query_length) %>%
-  mutate(allele1 = gsub('gene_','',allele1),
-           allele=if_else( grepl('group', allele1),str_extract(allele1, "^[^_]+_[^_]+") ,  str_extract(allele1, "^(.*?)(?=_)"))
-  )
-# 
-# p1a <- p1$gain_loss %>%
-#   dplyr::rename(strain=Var1, allele=Var2) %>%
-#   left_join(loc1, by='allele') %>%
-#   filter(value %in% c(-1,1) & !is.na(start)) %>%
-#   mutate(value=as.factor(value) ,strainN= as.numeric(as.factor(strain))+rnorm(n(), 0, 0.05) )
-# 
-# p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
-#          geom_point(size=0.3) +
-#        theme_classic() +
-#     xlim(range(loc1$start) ) +
-# 
-#   geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
-# 
-# ggplotly(p2a)
-```
-
-Set 2: Parent strain is 15B/C, a carriage isolate from Hungary, ID Pool_hung_H10 (H124)
-
-
-7F, 6C (2), 35B, 35F (2), 3, 22F, 16F, 15B/C, 11A have the cassette added around 1235484
-```{r}
-loc2 <- loc1 %>%
-  group_by(allele) %>%
-  summarize(start=min(start), end=max(end))
-
-p1a <- p2$gain_loss %>%
-  dplyr::rename(strain=Var1, allele1=Var2) %>%
-  mutate(allele=if_else( grepl('group', allele1),str_extract(allele1, "^[^_]+_[^_]+") ,  str_extract(allele1, "^(.*?)(?=_)"))) %>%
-  right_join(loc2, by='allele') %>%
-  filter(value %in% c(-1,1) & !is.na(start)) %>%
-  mutate(value=as.factor(value) ,strainN= as.numeric(as.factor(strain))+rnorm(n(), 0, 0.05) )
-
-p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
-         geom_point(size=0.3) +
-       theme_classic() +
-    xlim(range(loc1$start) ) +
-  geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
-
-ggplotly(p2a)
-```
-
-Set 3: Parent strain is serotype 22F, ID: ABC010003966, obtained from the CDC (IPD isolate)
-
-7F, 6C, 35B, 35F, 3, 22F,16F, 15B.C, 11A (this is the same set of serotypes seen for set 2...are these mislabeled cps genes? cps adjacent genes on these backgrounds? on set 1, some of the serotypes overlap, some do not.
-```{r}
-
-loc2 <- loc1 %>%
-  group_by(allele) %>%
-  summarize(start=min(start), end=max(end))
-
-p1b <- p3$gain_loss %>%
-  dplyr::rename(strain=Var1, allele1=Var2) %>%
-  mutate(allele=if_else( grepl('group', allele1),str_extract(allele1, "^[^_]+_[^_]+") ,  str_extract(allele1, "^(.*?)(?=_)"))) %>%
-  left_join(loc2, by='allele') %>%
-  filter(value %in% c(-1,1) & !is.na(start)) %>%
-  mutate(value=as.factor(value) ,strainN= as.numeric(as.factor(strain))+rnorm(n(), 0, 0.05) )
-
-p2b <- ggplot(p1b, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
-         geom_point(size=0.3) +
-       theme_classic() +
-    xlim(range(loc1$start) ) +
-  geom_vline(xintercept=c(315597, 339358)) #roughly dexB and aliA
-
-ggplotly(p2b)
-```
-
-
-```{r}
-out.list <- list('presence_15bc'=p2, 'presence_22f'=p3,'map15bc'=p2a,
-         'map22f'=p2b)
-saveRDS(out.list,'./data/plots.rds')
-```
-
-
-## Same but align to Hungary-19A
-
-```{r}
-loc2 <- read.csv('./Data/hungary19A-tblastn-Alignment-HitTable.csv', header=F) %>%
-  dplyr::rename(allele=V1, pct_ident=V3, start=V9, end=V10, positives_pct=V13, matchNaa=V4, query_length =V8) %>%
-  mutate(pct_coverage = (matchNaa)/query_length*100
-         ) %>%
-  filter(pct_ident>80 & pct_coverage >80) %>%
-  select(allele, start, end,pct_ident,pct_coverage,query_length)
-
-
-p1a <- p1$gain_loss %>%
-  dplyr::rename(strain=Var1, allele=Var2) %>%
-  left_join(loc2, by='allele') %>%
-  filter(value %in% c(-1,1) & !is.na(start)) %>%
-  mutate(value=as.factor(value) ,strainN= as.numeric(as.factor(strain))+rnorm(n(), 0, 0.05) )
-
-p2a <- ggplot(p1a, aes( y=strainN, x=start ,color=value,text=paste(strain,allele), alpha=0.5 )) +
-         geom_point(size=0.3) +
-       theme_classic() +
-    xlim(range(loc2$start) ) +
-  geom_vline(xintercept=c(56407, 2244856)) #roughly dexB and aliA
-
-ggplotly(p2a)
-```
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6727871/
 
