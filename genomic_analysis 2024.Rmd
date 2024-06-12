@@ -54,14 +54,14 @@ b1 <- bind_rows( a1,a2)
 # a value of "0" means the gene is present/absent in both the ref WT and capsule-switched strain, "1" means present in the WT but not the capsule-switched strain (i.e., possibly deleted), and "2" means absence in the WT but present in the capsule-switched strain (i.e., possibly inserted).
 
 c1 <- read.table('./Data/pangenome/York.gene.presence.absence.annotation.tsv', header=T) %>%
-  left_join(b1, by='gene.cluster.name') %>%
+  full_join(b1, by='gene.cluster.name') %>%
   filter(value==2) %>%
   group_by(gene.cluster.annotation) %>%
   mutate(N_insert=n()) %>%
   filter(N_insert>1 & gene.cluster.annotation  !='hypothetical protein')
 
 
-
+write.csv(c1,'./Results/insertions.csv')
 
 
 
