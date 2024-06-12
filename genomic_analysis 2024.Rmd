@@ -45,17 +45,19 @@ a1 <- read.table('./Data/pangenome/York.gene.presence.absence.15BC.tsv', header=
   rename( gene.cluster.name=variable)
 
 a2 <- read.table('./Data/pangenome/York.gene.presence.absence.22F.tsv', header=T)%>%
-  dplyr::select(-sample.id, -serotype.pcr,-sample.name.full,-sample.type, -sequencing.run, -sample.sequenced.clones,-serotype.genome) %>%
+  mutate(keep = if_else( serotype.switched.strain=='24F' & sample.id=='SP_307',1, if_else( serotype.switched.strain !='24F',1,0)))%>%
+  filter(keep==1) %>%
+  dplyr::select(-sample.id, -keep,-serotype.pcr,-sample.name.full,-sample.type, -sequencing.run, -sample.sequenced.clones,-serotype.genome) %>%
   reshape2::melt(.,id.vars=c('serotype.parental.strain','serotype.switched.strain','gpsc.lineage')) %>%
   rename( gene.cluster.name=variable)
 
 b1 <- bind_rows( a1,a2)
 
-# a value of "0" means the gene is present/absent in both the ref WT and capsule-switched strain, "1" means present in the WT but not the capsule-switched strain (i.e., possibly deleted), and "2" means absence in the WT but present in the capsule-switched strain (i.e., possibly inserted).
+# a value of "1" means inserted
 
 c1 <- read.table('./Data/pangenome/York.gene.presence.absence.annotation.tsv', header=T) %>%
   full_join(b1, by='gene.cluster.name') %>%
-  filter(value==2) %>%
+  filter(value==1) %>%
   group_by(gene.cluster.annotation) %>%
   mutate(N_insert=n()) %>%
   filter(N_insert>1 & gene.cluster.annotation  !='hypothetical protein')
@@ -65,6 +67,37 @@ write.csv(c1,'./Results/insertions.csv')
 
 
 
+ds1a <- read.table('./Data/pangenome/York.gene.presence.absence.annotation.tsv', header=T) %>%
+  full_join(b1, by='gene.cluster.name') %>%
+  filter(serotype.parental.strain=='15BC' ) %>%
+  mutate(geneid=paste0(gene.cluster.name,gene.cluster.annotation))
+
+ds1b <- ds1a %>% dplyr::select(-serotype.parental.strain,-gpsc.lineage, -gene.cluster.annotation,-gene.cluster.name,-gene.cluster.non.unique.name,-rep.gene.sequence) %>%
+  reshape2::dcast(serotype.switched.strain~geneid, value.var='value') 
+
+ds1c <- ds1b %>%
+  dplyr::select(-serotype.switched.strain) %>%
+  as.matrix() 
+
+row.names(ds1c) <- ds1b$serotype.switched.strain
+
+ heatmaply(ds1c, 
+               #dendrogram = "row",
+               xlab = "", ylab = "", 
+               main = "",
+               scale = "none",
+               margins = c(60,100,40,20),
+               grid_gap=0,
+               titleX = FALSE,
+               hide_colorbar = TRUE,
+               branches_lwd = 0.1,
+               label_names = c("Serotype/isolate", "Feature:", "Value"),
+               fontsize_row = 5, fontsize_col = 5,
+               labCol = colnames(ds1c),
+               labRow = rownames(ds1c),
+               heatmap_layers = theme(axis.line=element_blank()
+                                      )
+ )
 ```
 
 nspC/aguA locus acquired with 8, 24F, 15BC on GPSC19;at least a couple of these seem to be in an operon (AguA, nspC):
