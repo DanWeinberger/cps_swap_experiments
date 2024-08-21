@@ -75,3 +75,5 @@ TabularToFasta("./Data/aa_york.csv")  #note this generates a FASTA file on the h
 
 #IN tblastn, upload AA sequence, BLAST against TIGR4 specifically, then 'download all' as hit table csv. note use tblastn NOT blastn
 ```
+
+
