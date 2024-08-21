@@ -1,0 +1,6 @@
+accession,start,end,cds_product
+LR536833.1,391587,392972,Error: 'ExactPosition' object has no attribute 'position'
+LR216040.1,364757,366142,Error: 'ExactPosition' object has no attribute 'position'
+LR216022.1,457335,458720,Error: 'ExactPosition' object has no attribute 'position'
+LR216018.1,415779,417164,Error: 'ExactPosition' object has no attribute 'position'
+CP031248.1,1153892,1152507,No matching CDS
